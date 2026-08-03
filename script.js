@@ -251,14 +251,14 @@ function showProfile(person) {
         info.innerHTML = `
             <h2>Harish Raghavendar B</h2>
             <p><b>Class:</b> B.Sc. Computer Science with Artificial Intelligence</p>
-            <p><b>Role:</b> Web Developer & AI Enthusiast</p>
+            <p><b>Role:</b> Web Developer </p>
             <p><b>Project:</b> Student Management System</p>
         `;
     } else {
         info.innerHTML = `
             <h2>GOKUL RAJ</h2>
             <p><b>Class:</b> B.Sc. Computer Science with Artificial Intelligence</p>
-            <p><b>Role:</b> UI Designer</p>
+            <p><b>Role:</b>ARTIST</p>
             <p><b>Contribution:</b> Project Head</p>
         `;
     }
