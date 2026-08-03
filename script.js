@@ -444,7 +444,7 @@ function showProfile(person) {
         `;
     } else {
         info.innerHTML = `
-            <h2>Your Friend's Name</h2>
+            <h2>Gokul Raj</h2>
             <p><b>Class:</b> B.Sc. Computer Science with Artificial Intelligence</p>
             <p><b>Role:</b> UI Designer</p>
             <p><b>Contribution:</b> Project Support</p>
