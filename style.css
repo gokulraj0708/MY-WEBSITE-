@@ -774,6 +774,17 @@ transform:scale(1.05);
     transition:.3s;
 }
 
+.member h3{
+    color:#fff;
+}
+
+#teamMenu > p{
+    color:#fff;
+    text-align:center;
+    font-size:13px;
+    opacity:.8;
+}
+
 .member:hover{
     background:#444;
     transform:translateX(5px);
