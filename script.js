@@ -6,8 +6,8 @@ const closeBtn = document.getElementById("closeBtn");
 const saveBtn = document.getElementById("saveBtn");
 
 const nameInput = document.getElementById("name");
-const ageInput = document.getElementById("age");
 const deptInput = document.getElementById("dept");
+const mobileInput = document.getElementById("mobile");
 const genderInput = document.getElementById("gender");
 
 const table = document.getElementById("studentTable");
@@ -36,7 +36,9 @@ const authTitle = document.getElementById("authTitle");
 const authSwitchText = document.getElementById("authSwitchText");
 const authSwitchLink = document.getElementById("authSwitchLink");
 const logoutBtn = document.getElementById("logoutBtn");
-const loggedInAs = document.getElementById("loggedInAs");
+const logoutConfirmOverlay = document.getElementById("logoutConfirmOverlay");
+const logoutYesBtn = document.getElementById("logoutYesBtn");
+const logoutCancelBtn = document.getElementById("logoutCancelBtn");
 
 let isSignupMode = false;
 
@@ -78,6 +80,15 @@ authSubmitBtn.onclick = () => {
 };
 
 logoutBtn.onclick = () => {
+    logoutConfirmOverlay.classList.add("active");
+};
+
+logoutCancelBtn.onclick = () => {
+    logoutConfirmOverlay.classList.remove("active");
+};
+
+logoutYesBtn.onclick = () => {
+    logoutConfirmOverlay.classList.remove("active");
     auth.signOut();
 };
 
@@ -104,7 +115,6 @@ auth.onAuthStateChanged((user) => {
     if (user) {
         authScreen.style.display = "none";
         appContent.style.display = "block";
-        loggedInAs.textContent = user.email;
         authEmail.value = "";
         authPassword.value = "";
 
@@ -149,17 +159,22 @@ saveBtn.onclick = () => {
 
     const student = {
         name: nameInput.value.trim(),
-        age: ageInput.value.trim(),
         dept: deptInput.value.trim(),
+        mobile: mobileInput.value.trim(),
         gender: genderInput.value
     };
 
     if (
         student.name === "" ||
-        student.age === "" ||
-        student.dept === ""
+        student.dept === "" ||
+        student.mobile === ""
     ) {
         alert("Please fill all fields.");
+        return;
+    }
+
+    if (!/^\d{10}$/.test(student.mobile)) {
+        alert("Please enter a valid 10-digit mobile number.");
         return;
     }
 
@@ -181,8 +196,8 @@ saveBtn.onclick = () => {
 
 function clearForm() {
     nameInput.value = "";
-    ageInput.value = "";
     deptInput.value = "";
+    mobileInput.value = "";
     genderInput.value = "Male";
 }
 
@@ -193,7 +208,16 @@ function renderStudents(list = students) {
     let male = 0;
     let female = 0;
 
-    list.forEach((student, index) => {
+    const sortedList = [...list].sort((a, b) => {
+        if (a.gender !== b.gender) {
+            return a.gender === "Female" ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+
+    sortedList.forEach((student) => {
+
+        const realIndex = students.indexOf(student);
 
         if(student.gender === "Male"){
             male++;
@@ -204,18 +228,18 @@ function renderStudents(list = students) {
         table.innerHTML += `
         <tr class="fade-row">
             <td>${student.name}</td>
-            <td>${student.age}</td>
             <td>${student.dept}</td>
+            <td>${student.mobile}</td>
             <td>${student.gender}</td>
 
             <td>
                 <button class="action-btn edit-btn"
-                onclick="editStudent(${index})">
+                onclick="editStudent(${realIndex})">
                 <i class="fa-solid fa-pen"></i>
                 </button>
 
                 <button class="action-btn delete-btn"
-                onclick="deleteStudent(${index})">
+                onclick="deleteStudent(${realIndex})">
                 <i class="fa-solid fa-trash"></i>
                 </button>
             </td>
@@ -224,7 +248,7 @@ function renderStudents(list = students) {
         `;
     });
 
-    totalStudents.innerText = list.length;
+    totalStudents.innerText = sortedList.length;
     maleCount.innerText = male;
     femaleCount.innerText = female;
 
@@ -236,8 +260,8 @@ function editStudent(index){
     popup.classList.add("active");
 
     nameInput.value = students[index].name;
-    ageInput.value = students[index].age;
     deptInput.value = students[index].dept;
+    mobileInput.value = students[index].mobile;
     genderInput.value = students[index].gender;
 
     editIndex = index;
@@ -260,11 +284,13 @@ function deleteStudent(index){
 }
 
 
-search.addEventListener("keyup",()=>{
+const searchSuggestions = document.getElementById("searchSuggestions");
 
-    const value = search.value.toLowerCase();
+search.addEventListener("keyup", () => {
 
-    const filtered = students.filter(student=>
+    const value = search.value.toLowerCase().trim();
+
+    const filtered = students.filter(student =>
 
         student.name.toLowerCase().includes(value) ||
         student.dept.toLowerCase().includes(value)
@@ -273,7 +299,64 @@ search.addEventListener("keyup",()=>{
 
     renderStudents(filtered);
 
+    if (value === "") {
+        searchSuggestions.innerHTML = "";
+        searchSuggestions.classList.remove("active");
+        return;
+    }
+
+    const nameMatches = students.filter(student =>
+        student.name.toLowerCase().includes(value)
+    );
+
+    if (nameMatches.length === 0) {
+        searchSuggestions.innerHTML = "";
+        searchSuggestions.classList.remove("active");
+        return;
+    }
+
+    searchSuggestions.innerHTML = nameMatches.map(student => {
+        const realIndex = students.indexOf(student);
+        return `<div class="suggestion-item" onclick="showStudentInfo(${realIndex})">
+                    <i class="fa-solid fa-user"></i> ${student.name}
+                </div>`;
+    }).join("");
+
+    searchSuggestions.classList.add("active");
+
 });
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".search-wrapper")) {
+        searchSuggestions.classList.remove("active");
+    }
+});
+
+function showStudentInfo(index) {
+
+    const student = students[index];
+    if (!student) return;
+
+    const popup = document.getElementById("studentInfoPopup");
+    const info = document.getElementById("studentInfoContent");
+
+    info.innerHTML = `
+        <h2>${student.name}</h2>
+        <p><b>Department:</b> ${student.dept}</p>
+        <p><b>Mobile No.:</b> ${student.mobile}</p>
+        <p><b>Gender:</b> ${student.gender}</p>
+    `;
+
+    popup.classList.add("active");
+
+    searchSuggestions.classList.remove("active");
+    search.value = "";
+    renderStudents();
+}
+
+document.getElementById("closeStudentInfo").onclick = function () {
+    document.getElementById("studentInfoPopup").classList.remove("active");
+};
 
 
 themeBtn.onclick = ()=>{

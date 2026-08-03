@@ -986,3 +986,147 @@ header{
     background:#f5f5f5;
     border-color:#ccc;
 }
+
+/* ================= LOGOUT CONFIRM ================= */
+
+#logoutConfirmOverlay{
+    position:fixed;
+    inset:0;
+    z-index:6000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,.5);
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .25s ease, visibility .25s ease;
+}
+
+#logoutConfirmOverlay.active{
+    opacity:1;
+    visibility:visible;
+}
+
+.logout-confirm-box{
+    width:320px;
+    max-width:85%;
+    background:#fff;
+    border-radius:16px;
+    padding:30px 26px;
+    text-align:center;
+    box-shadow:0 15px 40px rgba(0,0,0,.3);
+    transform:scale(.85) translateY(10px);
+    opacity:0;
+    transition:transform .25s ease, opacity .25s ease;
+}
+
+#logoutConfirmOverlay.active .logout-confirm-box{
+    transform:scale(1) translateY(0);
+    opacity:1;
+}
+
+.logout-confirm-icon{
+    font-size:34px;
+    color:#e74c3c;
+    background:#fdecea;
+    width:64px;
+    height:64px;
+    line-height:64px;
+    border-radius:50%;
+    margin:0 auto 16px;
+}
+
+.logout-confirm-box h3{
+    font-size:19px;
+    color:#222;
+    margin-bottom:8px;
+}
+
+.logout-confirm-box p{
+    font-size:14px;
+    color:#666;
+    margin-bottom:22px;
+}
+
+.logout-confirm-actions{
+    display:flex;
+    gap:12px;
+}
+
+.logout-confirm-actions button{
+    flex:1;
+    padding:11px;
+    border-radius:10px;
+    border:none;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+#logoutCancelBtn{
+    background:#f1f1f1;
+    color:#444;
+}
+
+#logoutCancelBtn:hover{
+    background:#e2e2e2;
+}
+
+#logoutYesBtn{
+    background:#e74c3c;
+    color:#fff;
+}
+
+#logoutYesBtn:hover{
+    background:#c0392b;
+}
+
+/* ================= SEARCH SUGGESTIONS ================= */
+
+.search-wrapper{
+    position:relative;
+    flex:1;
+}
+
+.search-wrapper input{
+    width:100%;
+}
+
+#searchSuggestions{
+    position:absolute;
+    top:calc(100% + 6px);
+    left:0;
+    right:0;
+    background:#fff;
+    border-radius:10px;
+    box-shadow:0 10px 25px rgba(0,0,0,.15);
+    max-height:220px;
+    overflow-y:auto;
+    z-index:500;
+    display:none;
+}
+
+#searchSuggestions.active{
+    display:block;
+}
+
+.suggestion-item{
+    padding:10px 14px;
+    font-size:14px;
+    color:#333;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    transition:.15s;
+}
+
+.suggestion-item:hover{
+    background:#f0f4ff;
+    color:#2575fc;
+}
+
+.suggestion-item:not(:last-child){
+    border-bottom:1px solid #f0f0f0;
+}

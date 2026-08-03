@@ -7,6 +7,16 @@
 
     <link rel="stylesheet" href="style.css">
 
+    <!-- PWA: makes the app installable with its own icon and window -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2575fc">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Students">
+
     <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet"
@@ -69,8 +79,6 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
     <h1>STUDENT MANAGEMENT SYSTEM</h1>
 
     <div>
-        <span id="loggedInAs"></span>
-
         <button id="logoutBtn" title="Logout">
             <i class="fa-solid fa-right-from-bracket"></i>
         </button>
@@ -104,7 +112,10 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
 
 <div class="top">
 
-<input type="text" id="search" placeholder="Search Student...">
+<div class="search-wrapper">
+    <input type="text" id="search" placeholder="Search Student..." autocomplete="off">
+    <div id="searchSuggestions"></div>
+</div>
 
 <button id="addBtn">
 <i class="fa-solid fa-plus"></i>
@@ -140,9 +151,9 @@ Add Student
 
 <th>Name</th>
 
-<th>Age</th>
-
 <th>Department</th>
+
+<th>Mobile No.</th>
 
 <th>Gender</th>
 
@@ -170,9 +181,9 @@ Add Student
 
 <input type="text" id="name" placeholder="Student Name">
 
-<input type="number" id="age" placeholder="Age">
-
 <input type="text" id="dept" placeholder="Department">
+
+<input type="tel" id="mobile" placeholder="Mobile No." maxlength="10">
 
 <select id="gender">
 
@@ -201,6 +212,25 @@ Add Student
     </div>
 </div>
 
+<div id="studentInfoPopup" class="profile-popup">
+    <div class="profile-box">
+        <span id="closeStudentInfo">&times;</span>
+        <div id="studentInfoContent"></div>
+    </div>
+</div>
+
+<div id="logoutConfirmOverlay">
+    <div class="logout-confirm-box">
+        <i class="fa-solid fa-right-from-bracket logout-confirm-icon"></i>
+        <h3>Log out?</h3>
+        <p>Are you sure you want to log out of your account?</p>
+        <div class="logout-confirm-actions">
+            <button id="logoutCancelBtn" type="button">No</button>
+            <button id="logoutYesBtn" type="button">Yes, log out</button>
+        </div>
+    </div>
+</div>
+
 </div> <!-- /#appContent -->
 
 <script>
@@ -223,6 +253,17 @@ Add Student
 
 
 <script src="script.js"></script>
+
+<script>
+    // Register service worker so browsers offer the "Install" / "Add to Home Screen" prompt.
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch((err) => {
+                console.warn('Service worker registration failed:', err);
+            });
+        });
+    }
+</script>
 
 </body>
 </html>
