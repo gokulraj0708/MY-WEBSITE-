@@ -422,8 +422,6 @@ header{
     flex-direction:column;
     gap:15px;
     text-align:center;
-    position:relative;
-    padding-top:75px;
 }
 
 header h1{
@@ -431,27 +429,27 @@ header h1{
 }
 
 header > div{
-    display:contents;
+    display:flex;
+    width:100%;
+    align-items:center;
+    margin:0;
+    gap:15px;
 }
 
 #themeBtn{
-    position:absolute;
-    top:20px;
-    left:20px;
+    order:1;
     margin:0;
 }
 
 #logoutBtn{
-    position:absolute;
-    top:20px;
-    right:75px;
-    margin:0;
+    order:2;
+    margin-left:auto;
+    margin-right:0;
 }
 
 header .profile-wrapper{
-    position:absolute;
-    top:20px;
-    right:20px;
+    order:3;
+    position:relative;
 }
 
 .top{
