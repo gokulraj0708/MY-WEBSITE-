@@ -81,6 +81,16 @@ logoutBtn.onclick = () => {
     auth.signOut();
 };
 
+const googleSignInBtn = document.getElementById("googleSignInBtn");
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+googleSignInBtn.onclick = () => {
+    authError.textContent = "";
+    auth.signInWithPopup(googleProvider).catch((err) => {
+        authError.textContent = err.message;
+    });
+};
+
 // This runs automatically whenever login state changes,
 // and on ANY device the moment that user logs in.
 auth.onAuthStateChanged((user) => {
