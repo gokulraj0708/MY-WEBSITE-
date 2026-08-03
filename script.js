@@ -19,8 +19,109 @@ const femaleCount = document.getElementById("femaleCount");
 
 const themeBtn = document.getElementById("themeBtn");
 
-let students = JSON.parse(localStorage.getItem("students")) || [];
+let students = [];
 let editIndex = -1;
+let currentUser = null;
+let unsubscribeStudents = null; // Firestore real-time listener
+
+/* ================= AUTH ================= */
+
+const authScreen = document.getElementById("authScreen");
+const appContent = document.getElementById("appContent");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authError = document.getElementById("authError");
+const authSubmitBtn = document.getElementById("authSubmitBtn");
+const authTitle = document.getElementById("authTitle");
+const authSwitchText = document.getElementById("authSwitchText");
+const authSwitchLink = document.getElementById("authSwitchLink");
+const logoutBtn = document.getElementById("logoutBtn");
+const loggedInAs = document.getElementById("loggedInAs");
+
+let isSignupMode = false;
+
+authSwitchLink.onclick = (e) => {
+    e.preventDefault();
+    isSignupMode = !isSignupMode;
+    authError.textContent = "";
+    if (isSignupMode) {
+        authTitle.textContent = "Create an account";
+        authSubmitBtn.textContent = "Sign Up";
+        authSwitchText.textContent = "Already have an account?";
+        authSwitchLink.textContent = "Login";
+    } else {
+        authTitle.textContent = "Login to continue";
+        authSubmitBtn.textContent = "Login";
+        authSwitchText.textContent = "Don't have an account?";
+        authSwitchLink.textContent = "Sign up";
+    }
+};
+
+authSubmitBtn.onclick = () => {
+    const email = authEmail.value.trim();
+    const password = authPassword.value;
+
+    if (!email || !password) {
+        authError.textContent = "Please enter email and password.";
+        return;
+    }
+
+    authError.textContent = "";
+
+    const action = isSignupMode
+        ? auth.createUserWithEmailAndPassword(email, password)
+        : auth.signInWithEmailAndPassword(email, password);
+
+    action.catch((err) => {
+        authError.textContent = err.message;
+    });
+};
+
+logoutBtn.onclick = () => {
+    auth.signOut();
+};
+
+// This runs automatically whenever login state changes,
+// and on ANY device the moment that user logs in.
+auth.onAuthStateChanged((user) => {
+    currentUser = user;
+
+    if (unsubscribeStudents) {
+        unsubscribeStudents();
+        unsubscribeStudents = null;
+    }
+
+    if (user) {
+        authScreen.style.display = "none";
+        appContent.style.display = "block";
+        loggedInAs.textContent = user.email;
+        authEmail.value = "";
+        authPassword.value = "";
+
+        // Real-time listener: keeps this user's data in sync
+        // across every device, live, no manual refresh needed.
+        unsubscribeStudents = db.collection("students")
+            .doc(user.uid)
+            .onSnapshot((doc) => {
+                students = doc.exists ? (doc.data().list || []) : [];
+                renderStudents();
+            }, (err) => {
+                console.error("Sync error:", err);
+            });
+    } else {
+        appContent.style.display = "none";
+        authScreen.style.display = "flex";
+        students = [];
+        renderStudents();
+    }
+});
+
+function saveStudentsToCloud() {
+    if (!currentUser) return;
+    db.collection("students").doc(currentUser.uid).set({
+        list: students
+    });
+}
 
 
 
@@ -59,10 +160,7 @@ saveBtn.onclick = () => {
         editIndex = -1;
     }
 
-    localStorage.setItem(
-        "students",
-        JSON.stringify(students)
-    );
+    saveStudentsToCloud();
 
     popup.classList.remove("active");
     clearForm();
@@ -143,10 +241,7 @@ function deleteStudent(index){
 
         students.splice(index,1);
 
-        localStorage.setItem(
-            "students",
-            JSON.stringify(students)
-        );
+        saveStudentsToCloud();
 
         renderStudents();
 
@@ -251,15 +346,15 @@ function showProfile(person) {
         info.innerHTML = `
             <h2>Harish Raghavendar B</h2>
             <p><b>Class:</b> B.Sc. Computer Science with Artificial Intelligence</p>
-            <p><b>Role:</b> Web Developer </p>
+            <p><b>Role:</b> Web Developer & AI Enthusiast</p>
             <p><b>Project:</b> Student Management System</p>
         `;
     } else {
         info.innerHTML = `
-            <h2>GOKUL RAJ</h2>
+            <h2>Your Friend's Name</h2>
             <p><b>Class:</b> B.Sc. Computer Science with Artificial Intelligence</p>
-            <p><b>Role:</b>ARTIST</p>
-            <p><b>Contribution:</b> Project Head</p>
+            <p><b>Role:</b> UI Designer</p>
+            <p><b>Contribution:</b> Project Support</p>
         `;
     }
 

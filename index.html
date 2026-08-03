@@ -11,6 +11,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+
+    <!-- Firebase (Auth + Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 
 <body>
@@ -21,10 +26,28 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
     <span></span>
     <span></span>
 </div>
+<!-- Login / Signup Screen -->
+<div id="authScreen">
+    <div class="auth-box">
+        <h1><i class="fa-solid fa-user-graduate"></i> Student Management System</h1>
+        <p id="authTitle">Login to continue</p>
+
+        <input type="email" id="authEmail" placeholder="Email">
+        <input type="password" id="authPassword" placeholder="Password">
+        <p id="authError" class="auth-error"></p>
+
+        <button id="authSubmitBtn">Login</button>
+        <p class="auth-switch">
+            <span id="authSwitchText">Don't have an account?</span>
+            <a href="#" id="authSwitchLink">Sign up</a>
+        </p>
+    </div>
+</div>
+
 <div id="welcomeScreen">
     <div class="welcome-box">
         <h1>👋 Welcome!</h1>
-        <h2>Hi, created by HARISH and GOKUL</h2>
+        <h2>Hi, I'm Hari</h2>
         <p>B.Sc. Computer Science with Artificial Intelligence</p>
         <p>Welcome to my Student Management System</p>
     </div>
@@ -33,10 +56,17 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
 <div class="loader">
     <div class="spinner"></div>
 </div>
+<div id="appContent">
 <header>
     <h1>STUDENT MANAGEMENT SYSTEM</h1>
 
     <div>
+        <span id="loggedInAs"></span>
+
+        <button id="logoutBtn" title="Logout">
+            <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+
         <button id="themeBtn">
             <i class="fa-solid fa-moon"></i>
         </button>
@@ -162,6 +192,26 @@ Add Student
         <div id="profileInfo"></div>
     </div>
 </div>
+
+</div> <!-- /#appContent -->
+
+<script>
+    // ====== PASTE YOUR FIREBASE CONFIG HERE ======
+    // Firebase Console -> Project Settings -> General -> Your apps -> SDK setup and config
+    const firebaseConfig = {
+        apiKey: "AIzaSyDXOfsJMc09CZK88tf1Tqwx38kc25JUAJA",
+        authDomain: "student-533ac.firebaseapp.com",
+        projectId: "student-533ac",
+        storageBucket: "student-533ac.firebasestorage.app",
+        messagingSenderId: "394958751398",
+        appId: "1:394958751398:web:9886c482935bfcd3891667"
+    };
+    // ==============================================
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+</script>
 
 
 <script src="script.js"></script>
