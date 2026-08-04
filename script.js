@@ -46,6 +46,7 @@ authSwitchLink.onclick = (e) => {
     e.preventDefault();
     isSignupMode = !isSignupMode;
     authError.textContent = "";
+    authInfo.textContent = "";
     if (isSignupMode) {
         authTitle.textContent = "Create an account";
         authSubmitBtn.textContent = "Sign Up";
@@ -69,6 +70,7 @@ authSubmitBtn.onclick = () => {
     }
 
     authError.textContent = "";
+    authInfo.textContent = "";
 
     const action = isSignupMode
         ? auth.createUserWithEmailAndPassword(email, password)
@@ -77,6 +79,58 @@ authSubmitBtn.onclick = () => {
     action.catch((err) => {
         authError.textContent = err.message;
     });
+};
+
+const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+const authInfo = document.getElementById("authInfo");
+
+forgotPasswordLink.onclick = (e) => {
+    e.preventDefault();
+    authError.textContent = "";
+    authInfo.textContent = "";
+
+    const email = authEmail.value.trim();
+
+    if (!email) {
+        authError.textContent = "Enter your email above first, then tap 'Forgot password?'.";
+        authEmail.focus();
+        return;
+    }
+
+    auth.sendPasswordResetEmail(email)
+        .then(() => {
+            authInfo.textContent = `Password reset link sent to ${email}. Check your inbox.`;
+        })
+        .catch((err) => {
+            authError.textContent = err.message;
+        });
+};
+
+const resetPasswordBtn = document.getElementById("resetPasswordBtn");
+
+resetPasswordBtn.onclick = () => {
+    if (!currentUser || !currentUser.email) return;
+
+    const usesPassword = currentUser.providerData.some(
+        (p) => p.providerId === "password"
+    );
+
+    if (!usesPassword) {
+        alert("Your account signs in with Google, so there's no password to reset.");
+        return;
+    }
+
+    if (!confirm(`Send a password reset link to ${currentUser.email}?`)) {
+        return;
+    }
+
+    auth.sendPasswordResetEmail(currentUser.email)
+        .then(() => {
+            alert(`Password reset link sent to ${currentUser.email}.`);
+        })
+        .catch((err) => {
+            alert(err.message);
+        });
 };
 
 logoutBtn.onclick = () => {

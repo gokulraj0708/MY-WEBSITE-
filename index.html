@@ -44,7 +44,13 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
 
         <input type="email" id="authEmail" placeholder="Email">
         <input type="password" id="authPassword" placeholder="Password">
+
+        <div class="auth-forgot" id="forgotPasswordWrap">
+            <a href="#" id="forgotPasswordLink">Forgot password?</a>
+        </div>
+
         <p id="authError" class="auth-error"></p>
+        <p id="authInfo" class="auth-info"></p>
 
         <button id="authSubmitBtn">Login</button>
 
@@ -81,6 +87,10 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
     <div>
         <button id="logoutBtn" title="Logout">
             <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+
+        <button id="resetPasswordBtn" title="Reset Password">
+            <i class="fa-solid fa-key"></i>
         </button>
 
         <button id="themeBtn">
