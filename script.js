@@ -7,8 +7,27 @@ const saveBtn = document.getElementById("saveBtn");
 
 const nameInput = document.getElementById("name");
 const deptInput = document.getElementById("dept");
+const deptOtherInput = document.getElementById("deptOther");
+const yearInput = document.getElementById("year");
+const regnoInput = document.getElementById("regno");
 const mobileInput = document.getElementById("mobile");
 const genderInput = document.getElementById("gender");
+
+const knownDepts = ["Bsc.cs.Ai", "Bsc.cs", "B.com", "Ba.English", "Ba.Tamil"];
+
+deptInput.addEventListener("change", () => {
+    if (deptInput.value === "Others") {
+        deptOtherInput.style.display = "block";
+        deptOtherInput.focus();
+    } else {
+        deptOtherInput.style.display = "none";
+        deptOtherInput.value = "";
+    }
+});
+
+regnoInput.addEventListener("input", () => {
+    regnoInput.value = regnoInput.value.replace(/\D/g, "").slice(0, 20);
+});
 
 const table = document.getElementById("studentTable");
 const search = document.getElementById("search");
@@ -200,6 +219,8 @@ function saveStudentsToCloud() {
 
 
 addBtn.onclick = () => {
+    editIndex = -1;
+    clearForm();
     popup.classList.add("active");
 };
 
@@ -211,9 +232,17 @@ closeBtn.onclick = () => {
 
 saveBtn.onclick = () => {
 
+    const dept = deptInput.value === "Others"
+        ? deptOtherInput.value.trim()
+        : deptInput.value;
+
+    const regno = regnoInput.value.trim();
+
     const student = {
         name: nameInput.value.trim(),
-        dept: deptInput.value.trim(),
+        dept: dept,
+        year: yearInput.value,
+        regno: regno,
         mobile: mobileInput.value.trim(),
         gender: genderInput.value
     };
@@ -221,6 +250,7 @@ saveBtn.onclick = () => {
     if (
         student.name === "" ||
         student.dept === "" ||
+        student.year === "" ||
         student.mobile === ""
     ) {
         alert("Please fill all fields.");
@@ -229,6 +259,11 @@ saveBtn.onclick = () => {
 
     if (!/^\d{10}$/.test(student.mobile)) {
         alert("Please enter a valid 10-digit mobile number.");
+        return;
+    }
+
+    if (regno !== "" && !/^\d{1,20}$/.test(regno)) {
+        alert("Reg. No. must contain only numbers (1 to 20 digits).");
         return;
     }
 
@@ -251,6 +286,10 @@ saveBtn.onclick = () => {
 function clearForm() {
     nameInput.value = "";
     deptInput.value = "";
+    deptOtherInput.value = "";
+    deptOtherInput.style.display = "none";
+    yearInput.value = "";
+    regnoInput.value = "";
     mobileInput.value = "";
     genderInput.value = "Male";
 }
@@ -281,7 +320,7 @@ function renderStudents(list = students) {
 
         table.innerHTML += `
         <tr class="fade-row">
-            <td>${student.name}</td>
+            <td><a href="#" class="name-link" onclick="showStudentInfo(${realIndex}); return false;">${student.name}</a></td>
             <td>${student.dept}</td>
             <td><a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></td>
             <td>${student.gender}</td>
@@ -314,7 +353,19 @@ function editStudent(index){
     popup.classList.add("active");
 
     nameInput.value = students[index].name;
-    deptInput.value = students[index].dept;
+
+    if (knownDepts.includes(students[index].dept)) {
+        deptInput.value = students[index].dept;
+        deptOtherInput.style.display = "none";
+        deptOtherInput.value = "";
+    } else {
+        deptInput.value = "Others";
+        deptOtherInput.style.display = "block";
+        deptOtherInput.value = students[index].dept;
+    }
+
+    yearInput.value = students[index].year || "";
+    regnoInput.value = students[index].regno || "";
     mobileInput.value = students[index].mobile;
     genderInput.value = students[index].gender;
 
@@ -397,6 +448,8 @@ function showStudentInfo(index) {
     info.innerHTML = `
         <h2>${student.name}</h2>
         <p><b>Department:</b> ${student.dept}</p>
+        <p><b>Year:</b> ${student.year || "-"}</p>
+        <p><b>Reg. No.:</b> ${student.regno || "Not added"}</p>
         <p><b>Mobile No.:</b> <a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></p>
         <p><b>Gender:</b> ${student.gender}</p>
     `;

@@ -290,6 +290,18 @@ tbody tr:hover{
     gap:6px;
 }
 
+.name-link{
+    color:inherit;
+    text-decoration:none;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.name-link:hover{
+    color:#2575fc;
+    text-decoration:underline;
+}
+
 .call-link::before{
     content:"\f095";
     font-family:"Font Awesome 6 Free";

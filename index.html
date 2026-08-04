@@ -73,7 +73,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
         <h1>👋 Welcome!</h1>
         <h2>created by HARISH and GOKUL</h2>
         <p>B.Sc. Computer Science with Artificial Intelligence</p>
-        <p>Welcome to my Student Management System</p>
+        <p>Welcome to our Student Management System</p>
     </div>
 </div>
 
@@ -193,7 +193,26 @@ Add Student
 
 <input type="text" id="name" placeholder="Student Name">
 
-<input type="text" id="dept" placeholder="Department">
+<select id="dept">
+<option value="" disabled selected>Select Department</option>
+<option value="Bsc.cs.Ai">Bsc.cs.Ai</option>
+<option value="Bsc.cs">Bsc.cs</option>
+<option value="B.com">B.com</option>
+<option value="Ba.English">Ba.English</option>
+<option value="Ba.Tamil">Ba.Tamil</option>
+<option value="Others">Others</option>
+</select>
+
+<input type="text" id="deptOther" placeholder="Enter department" style="display:none;">
+
+<select id="year">
+<option value="" disabled selected>Select Year</option>
+<option value="I">I</option>
+<option value="II">II</option>
+<option value="III">III</option>
+</select>
+
+<input type="text" id="regno" placeholder="Reg. No. (optional)" maxlength="20" inputmode="numeric">
 
 <input type="tel" id="mobile" placeholder="Mobile No." maxlength="10">
 
