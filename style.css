@@ -7,6 +7,10 @@
     font-family:'Poppins',sans-serif;
 }
 
+html{
+    overscroll-behavior-y: contain;
+}
+
 body{
     min-height:100vh;
     background:linear-gradient(-45deg,#6a11cb,#2575fc,#00c6ff,#6a11cb);
@@ -14,6 +18,7 @@ body{
     animation:bgMove 12s ease infinite;
     color:#222;
     overflow-x:hidden;
+    overscroll-behavior-y: contain;
 }
 
 @keyframes bgMove{
