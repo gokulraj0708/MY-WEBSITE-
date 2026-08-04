@@ -96,9 +96,32 @@ authSubmitBtn.onclick = () => {
         : auth.signInWithEmailAndPassword(email, password);
 
     action.catch((err) => {
-        authError.textContent = err.message;
+        authError.textContent = getFriendlyAuthError(err.code);
     });
 };
+
+function getFriendlyAuthError(code) {
+    switch (code) {
+        case "auth/invalid-credential":
+        case "auth/user-not-found":
+        case "auth/wrong-password":
+            return isSignupMode
+                ? "Something went wrong. Please try again."
+                : "No account found with that email and password. New here? Tap 'Sign up' below.";
+        case "auth/email-already-in-use":
+            return "An account with this email already exists. Please login instead.";
+        case "auth/invalid-email":
+            return "Please enter a valid email address.";
+        case "auth/weak-password":
+            return "Password should be at least 6 characters.";
+        case "auth/too-many-requests":
+            return "Too many attempts. Please wait a moment and try again.";
+        case "auth/network-request-failed":
+            return "Network error. Check your internet connection and try again.";
+        default:
+            return "Something went wrong. Please try again.";
+    }
+}
 
 const forgotPasswordLink = document.getElementById("forgotPasswordLink");
 const authInfo = document.getElementById("authInfo");
@@ -121,7 +144,9 @@ forgotPasswordLink.onclick = (e) => {
             authInfo.textContent = `Password reset link sent to ${email}. Check your inbox.`;
         })
         .catch((err) => {
-            authError.textContent = err.message;
+            authError.textContent = err.code === "auth/user-not-found"
+                ? "No account found with that email."
+                : getFriendlyAuthError(err.code);
         });
 };
 
@@ -148,7 +173,7 @@ resetPasswordBtn.onclick = () => {
             alert(`Password reset link sent to ${currentUser.email}.`);
         })
         .catch((err) => {
-            alert(err.message);
+            alert(getFriendlyAuthError(err.code));
         });
 };
 
@@ -171,7 +196,9 @@ const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleSignInBtn.onclick = () => {
     authError.textContent = "";
     auth.signInWithPopup(googleProvider).catch((err) => {
-        authError.textContent = err.message;
+        if (err.code !== "auth/popup-closed-by-user") {
+            authError.textContent = getFriendlyAuthError(err.code);
+        }
     });
 };
 
