@@ -283,7 +283,7 @@ function renderStudents(list = students) {
         <tr class="fade-row">
             <td>${student.name}</td>
             <td>${student.dept}</td>
-            <td>${student.mobile}</td>
+            <td><a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></td>
             <td>${student.gender}</td>
 
             <td>
@@ -397,7 +397,7 @@ function showStudentInfo(index) {
     info.innerHTML = `
         <h2>${student.name}</h2>
         <p><b>Department:</b> ${student.dept}</p>
-        <p><b>Mobile No.:</b> ${student.mobile}</p>
+        <p><b>Mobile No.:</b> <a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></p>
         <p><b>Gender:</b> ${student.gender}</p>
     `;
 

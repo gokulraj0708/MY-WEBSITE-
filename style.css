@@ -281,6 +281,30 @@ tbody tr:hover{
     transform:scale(1.1);
 }
 
+.call-link{
+    color:#2ecc71;
+    text-decoration:none;
+    font-weight:600;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+}
+
+.call-link::before{
+    content:"\f095";
+    font-family:"Font Awesome 6 Free";
+    font-weight:900;
+    font-size:12px;
+}
+
+.call-link:hover{
+    text-decoration:underline;
+}
+
+body.dark .call-link{
+    color:#4ade80;
+}
+
 /* Popup */
 
 .popup{
