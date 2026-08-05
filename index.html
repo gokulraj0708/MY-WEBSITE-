@@ -77,7 +77,7 @@
     </div>
 </div>
 
-<div class="loader">
+<div class="loader" id="loader">
     <div class="spinner"></div>
 </div>
 
@@ -104,6 +104,10 @@
             </button>
 
             <div class="team" id="teamMenu">
+                <div class="current-user" id="currentUserInfo">
+                    <i class="fa-solid fa-circle-user"></i>
+                    <span id="currentUserName">User</span>
+                </div>
                 <p>created by</p>
                 <div class="member" onclick="showProfile('hari')">
                     <img src="Snapchat-1003517570.jpg" class="profile-img">
@@ -113,6 +117,11 @@
                 <div class="member" onclick="showProfile('friend')">
                     <img src="IMG-20260802-WA0002.jpg" class="profile-img">
                     <h3>GOOGLE</h3>
+                </div>
+
+                <div class="team-feedback">
+                    <p>Any suggestions or report bug</p>
+                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=bharishraghavendar25904bscai@gmail.com&su=Student%20Management%20System%20-%20Feedback" target="_blank" rel="noopener" id="feedbackEmailLink">bharishraghavendar25904bscai@gmail.com</a>
                 </div>
             </div>
         </div>
@@ -209,6 +218,15 @@ Add Student
 </div>
 
 </div>
+</div>
+
+<div id="loginWelcomePopup" class="profile-popup">
+    <div class="profile-box login-welcome-box">
+        <span id="closeLoginWelcome">&times;</span>
+        <i class="fa-solid fa-circle-user login-welcome-icon"></i>
+        <h2 id="loginWelcomeName">Welcome!</h2>
+        <p>You have successfully logged in.</p>
+    </div>
 </div>
 
 <div id="profilePopup" class="profile-popup">

@@ -37,7 +37,16 @@ body{
     justify-content:center;
     align-items:center;
     z-index:9999;
-    animation:hideLoader .8s ease 1.8s forwards;
+    opacity:1;
+    visibility:visible;
+    transition:opacity .4s ease;
+}
+
+/* JS adds this once Firebase has determined whether the user
+   is already logged in, so we never flash the login screen. */
+.loader.hide{
+    opacity:0;
+    visibility:hidden;
 }
 
 .spinner{
@@ -928,6 +937,70 @@ header{
 #teamMenu.show{
     display:flex;
 }
+
+.team-feedback{
+    border-top:1px solid rgba(255,255,255,.15);
+    margin-top:4px;
+    padding-top:10px;
+    text-align:center;
+}
+
+.team-feedback p{
+    color:#fff;
+    font-size:12px;
+    opacity:.8;
+    margin:0 0 4px;
+}
+
+.team-feedback a{
+    color:#00bcd4;
+    font-size:12px;
+    word-break:break-all;
+    text-decoration:none;
+}
+
+.team-feedback a:hover{
+    text-decoration:underline;
+}
+
+.current-user{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px;
+    border-radius:10px;
+    background:rgba(255,255,255,.08);
+    margin-bottom:4px;
+}
+
+.current-user i{
+    font-size:24px;
+    color:#00bcd4;
+}
+
+.current-user span{
+    color:#fff;
+    font-weight:600;
+    font-size:14px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.login-welcome-box{
+    text-align:center;
+}
+
+.login-welcome-icon{
+    font-size:60px;
+    color:#2575fc;
+    margin-bottom:10px;
+}
+
+.login-welcome-box h2{
+    margin:5px 0;
+}
+
 /* ================= AUTH SCREEN ================= */
 
 #appContent{

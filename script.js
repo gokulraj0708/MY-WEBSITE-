@@ -204,7 +204,10 @@ googleSignInBtn.onclick = () => {
 
 // This runs automatically whenever login state changes,
 // and on ANY device the moment that user logs in.
+let authInitialized = false;
+
 auth.onAuthStateChanged((user) => {
+    const wasLoggedOut = !currentUser;
     currentUser = user;
 
     if (unsubscribeStudents) {
@@ -212,11 +215,19 @@ auth.onAuthStateChanged((user) => {
         unsubscribeStudents = null;
     }
 
+    updateCurrentUserDisplay(user);
+
     if (user) {
         authScreen.style.display = "none";
         appContent.style.display = "block";
         authEmail.value = "";
         authPassword.value = "";
+
+        // Only pop up the welcome message for an actual sign-in action,
+        // not when a previously logged-in session is restored on page load.
+        if (authInitialized && wasLoggedOut) {
+            showLoginWelcome(user);
+        }
 
         // Real-time listener: keeps this user's data in sync
         // across every device, live, no manual refresh needed.
@@ -234,7 +245,44 @@ auth.onAuthStateChanged((user) => {
         students = [];
         renderStudents();
     }
+
+    // Now that we know whether the user is already logged in, reveal the
+    // right screen. This keeps an already-logged-in user from ever seeing
+    // the login screen flash — they go straight to the app.
+    const loader = document.getElementById("loader");
+    if (loader) {
+        loader.classList.add("hide");
+    }
+
+    authInitialized = true;
 });
+
+function getUserDisplayName(user) {
+    if (!user) return "User";
+    return user.displayName || (user.email ? user.email.split("@")[0] : "User");
+}
+
+function updateCurrentUserDisplay(user) {
+    const nameEl = document.getElementById("currentUserName");
+    if (!nameEl) return;
+    nameEl.textContent = getUserDisplayName(user);
+}
+
+function showLoginWelcome(user) {
+    const popup = document.getElementById("loginWelcomePopup");
+    const nameEl = document.getElementById("loginWelcomeName");
+
+    nameEl.textContent = `Welcome, ${getUserDisplayName(user)}!`;
+    popup.classList.add("active");
+
+    setTimeout(() => {
+        popup.classList.remove("active");
+    }, 3000);
+}
+
+document.getElementById("closeLoginWelcome").onclick = function () {
+    document.getElementById("loginWelcomePopup").classList.remove("active");
+};
 
 function saveStudentsToCloud() {
     if (!currentUser) return;
@@ -245,9 +293,12 @@ function saveStudentsToCloud() {
 
 
 
+let lastDept = "";
+let lastDeptOther = "";
+
 addBtn.onclick = () => {
     editIndex = -1;
-    clearForm();
+    clearForm(true);
     popup.classList.add("active");
 };
 
@@ -301,6 +352,9 @@ saveBtn.onclick = () => {
         editIndex = -1;
     }
 
+    lastDept = deptInput.value;
+    lastDeptOther = deptOtherInput.value.trim();
+
     saveStudentsToCloud();
 
     popup.classList.remove("active");
@@ -310,15 +364,24 @@ saveBtn.onclick = () => {
 
 
 
-function clearForm() {
+function clearForm(prefillDept = false) {
     nameInput.value = "";
-    deptInput.value = "";
     deptOtherInput.value = "";
     deptOtherInput.style.display = "none";
     yearInput.value = "";
     regnoInput.value = "";
     mobileInput.value = "";
     genderInput.value = "Male";
+
+    if (prefillDept && lastDept) {
+        deptInput.value = lastDept;
+        if (lastDept === "Others") {
+            deptOtherInput.style.display = "block";
+            deptOtherInput.value = lastDeptOther;
+        }
+    } else {
+        deptInput.value = "";
+    }
 }
 
 function renderStudents(list = students) {
