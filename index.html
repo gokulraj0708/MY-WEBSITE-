@@ -19,8 +19,7 @@
 
     <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 
     <!-- Firebase (Auth + Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -29,13 +28,14 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
 </head>
 
 <body>
-    <div class="bg-animation">
+<div class="bg-animation">
     <span></span>
     <span></span>
     <span></span>
     <span></span>
     <span></span>
 </div>
+
 <!-- Login / Signup Screen -->
 <div id="authScreen">
     <div class="auth-box">
@@ -80,6 +80,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
 <div class="loader">
     <div class="spinner"></div>
 </div>
+
 <div id="appContent">
 <header>
     <h1>STUDENT MANAGEMENT SYSTEM</h1>
@@ -98,30 +99,29 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
         </button>
 
         <div class="profile-wrapper">
-    <button id="profileBtn">
-        <i class="fa-solid fa-user"></i>
-    </button>
+            <button id="profileBtn">
+                <i class="fa-solid fa-user"></i>
+            </button>
 
-    <div class="team" id="teamMenu">
-        <p>created by</p>
-        <div class="member" onclick="showProfile('hari')">
-            <img src="Snapchat-1003517570.jpg" class="profile-img">
-            <h3>HARISH</h3>
-        </div>
+            <div class="team" id="teamMenu">
+                <p>created by</p>
+                <div class="member" onclick="showProfile('hari')">
+                    <img src="Snapchat-1003517570.jpg" class="profile-img">
+                    <h3>HARISH</h3>
+                </div>
 
-        <div class="member" onclick="showProfile('friend')">
-            <img src="IMG-20260802-WA0002.jpg" class="profile-img">
-            <h3>GOOGLE</h3>
+                <div class="member" onclick="showProfile('friend')">
+                    <img src="IMG-20260802-WA0002.jpg" class="profile-img">
+                    <h3>GOOGLE</h3>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-    
 </header>
 
 <div class="container">
 
 <div class="top">
-
 <div class="search-wrapper">
     <input type="text" id="search" placeholder="Search Student..." autocomplete="off">
     <div id="searchSuggestions"></div>
@@ -131,11 +131,9 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
 <i class="fa-solid fa-plus"></i>
 Add Student
 </button>
-
 </div>
 
 <div class="cards">
-
 <div class="card">
 <h2 id="totalStudents">0</h2>
 <p>Total Students</p>
@@ -150,45 +148,29 @@ Add Student
 <h2 id="femaleCount">0</h2>
 <p>Female</p>
 </div>
-
 </div>
 
 <div class="table-wrapper">
 <table>
-
 <thead>
-
 <tr>
-
 <th>Name</th>
-
 <th>Department</th>
-
 <th>Mobile No.</th>
-
 <th>Gender</th>
-
 <th>Actions</th>
-
 </tr>
-
 </thead>
-
 <tbody id="studentTable">
-
 </tbody>
-
 </table>
 </div>
 
 </div>
 
 <!-- Popup -->
-
 <div class="popup" id="popup">
-
 <div class="popup-content">
-
 <h2>Add Student</h2>
 
 <input type="text" id="name" placeholder="Student Name">
@@ -217,23 +199,16 @@ Add Student
 <input type="tel" id="mobile" placeholder="Mobile No." maxlength="10">
 
 <select id="gender">
-
 <option>Male</option>
-
 <option>Female</option>
-
 </select>
 
 <div class="buttons">
-
 <button id="saveBtn">Save</button>
-
 <button id="closeBtn">Cancel</button>
-
 </div>
 
 </div>
-
 </div>
 
 <div id="profilePopup" class="profile-popup">
@@ -281,7 +256,6 @@ Add Student
     const auth = firebase.auth();
     const db = firebase.firestore();
 </script>
-
 
 <script src="script.js"></script>
 
