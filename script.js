@@ -35,10 +35,12 @@ const search = document.getElementById("search");
 const totalStudents = document.getElementById("totalStudents");
 const maleCount = document.getElementById("maleCount");
 const femaleCount = document.getElementById("femaleCount");
+const deptCount = document.getElementById("deptCount");
 
 const themeBtn = document.getElementById("themeBtn");
 
 let students = [];
+let currentVisibleList = students;
 let editIndex = -1;
 let currentUser = null;
 let unsubscribeStudents = null; // Firestore real-time listener
@@ -229,6 +231,9 @@ auth.onAuthStateChanged((user) => {
             showLoginWelcome(user);
         }
 
+        // Show placeholders while Firestore fetches this user's data.
+        renderSkeleton();
+
         // Real-time listener: keeps this user's data in sync
         // across every device, live, no manual refresh needed.
         unsubscribeStudents = db.collection("students")
@@ -384,9 +389,34 @@ function clearForm(prefillDept = false) {
     }
 }
 
+function renderSkeleton(rows = 4) {
+
+    table.innerHTML = Array.from({ length: rows }).map(() => `
+        <tr class="skeleton-row">
+            <td><div class="skeleton-bar" style="width:70%"></div></td>
+            <td><div class="skeleton-bar" style="width:60%"></div></td>
+            <td><div class="skeleton-bar" style="width:55%"></div></td>
+            <td><div class="skeleton-bar" style="width:40%;margin:0 auto"></div></td>
+            <td><div class="skeleton-bar skeleton-bar-actions"></div></td>
+        </tr>
+    `).join("");
+
+    [totalStudents, maleCount, femaleCount, deptCount].forEach((el) => {
+        el.classList.add("skeleton-num");
+        el.innerHTML = "";
+    });
+
+}
+
 function renderStudents(list = students) {
 
+    currentVisibleList = list;
+
     table.innerHTML = "";
+
+    [totalStudents, maleCount, femaleCount, deptCount].forEach((el) => {
+        el.classList.remove("skeleton-num");
+    });
 
     let male = 0;
     let female = 0;
@@ -434,6 +464,13 @@ function renderStudents(list = students) {
     totalStudents.innerText = sortedList.length;
     maleCount.innerText = male;
     femaleCount.innerText = female;
+
+    const uniqueDepts = new Set(
+        sortedList
+            .map((s) => (s.dept || "").trim())
+            .filter((d) => d !== "")
+    );
+    deptCount.innerText = uniqueDepts.size;
 
 }
 
@@ -483,7 +520,8 @@ const searchSuggestions = document.getElementById("searchSuggestions");
 
 search.addEventListener("keyup", () => {
 
-    const value = search.value.toLowerCase().trim();
+    const rawValue = search.value.trim();
+    const value = rawValue.toLowerCase();
 
     const filtered = students.filter(student =>
 
@@ -493,6 +531,7 @@ search.addEventListener("keyup", () => {
     );
 
     renderStudents(filtered);
+    updateBreadcrumb(rawValue ? `Search: "${rawValue}"` : null);
 
     if (value === "") {
         searchSuggestions.innerHTML = "";
@@ -548,12 +587,108 @@ function showStudentInfo(index) {
 
     searchSuggestions.classList.remove("active");
     search.value = "";
+    updateBreadcrumb(null);
     renderStudents();
 }
 
 document.getElementById("closeStudentInfo").onclick = function () {
     document.getElementById("studentInfoPopup").classList.remove("active");
 };
+
+function showStatPopup(type) {
+
+    const statPopup = document.getElementById("statListPopup");
+    const title = document.getElementById("statListTitle");
+    const content = document.getElementById("statListContent");
+
+    if (type === "dept") {
+
+        title.textContent = "Departments";
+
+        const deptMap = {};
+        students.forEach((s) => {
+            const d = (s.dept || "").trim();
+            if (d === "") return;
+            deptMap[d] = (deptMap[d] || 0) + 1;
+        });
+
+        const deptNames = Object.keys(deptMap).sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" })
+        );
+
+        content.innerHTML = deptNames.length === 0
+            ? `<p class="stat-list-empty">No departments yet.</p>`
+            : deptNames.map((d) => `
+                <div class="stat-list-item" onclick="filterByDept('${d.replace(/'/g, "\\'")}')">
+                    <i class="fa-solid fa-building"></i>
+                    <span>${d}</span>
+                    <b>${deptMap[d]} student${deptMap[d] === 1 ? "" : "s"}</b>
+                </div>
+            `).join("");
+
+    } else {
+
+        let list = currentVisibleList;
+        title.textContent = "All Students";
+
+        if (type === "male") {
+            list = currentVisibleList.filter((s) => s.gender === "Male");
+            title.textContent = "Boys";
+        } else if (type === "female") {
+            list = currentVisibleList.filter((s) => s.gender === "Female");
+            title.textContent = "Girls";
+        }
+
+        const sorted = [...list].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        );
+
+        content.innerHTML = sorted.length === 0
+            ? `<p class="stat-list-empty">No students yet.</p>`
+            : sorted.map((s) => {
+                const realIndex = students.indexOf(s);
+                return `
+                <div class="stat-list-item" onclick="openStudentFromStatList(${realIndex})">
+                    <i class="fa-solid fa-user"></i>
+                    <span>${s.name}</span>
+                    <b>${s.dept}</b>
+                </div>`;
+            }).join("");
+    }
+
+    statPopup.classList.add("active");
+
+}
+
+function openStudentFromStatList(index) {
+    document.getElementById("statListPopup").classList.remove("active");
+    showStudentInfo(index);
+}
+
+function filterByDept(dept) {
+    document.getElementById("statListPopup").classList.remove("active");
+    search.value = dept;
+    const filtered = students.filter((student) => student.dept === dept);
+    renderStudents(filtered);
+    updateBreadcrumb(dept);
+}
+
+document.getElementById("closeStatList").onclick = function () {
+    document.getElementById("statListPopup").classList.remove("active");
+};
+
+function updateBreadcrumb(label) {
+    const current = document.getElementById("breadcrumbCurrent");
+    if (!current) return;
+    current.textContent = label || "All Students";
+}
+
+function resetBreadcrumb() {
+    search.value = "";
+    searchSuggestions.classList.remove("active");
+    renderStudents();
+    updateBreadcrumb(null);
+}
 
 
 themeBtn.onclick = ()=>{
@@ -598,6 +733,10 @@ window.onclick = (e)=>{
 
     }
 
+    if(e.target===document.getElementById("statListPopup")){
+        e.target.classList.remove("active");
+    }
+
 };
 
 
@@ -623,6 +762,12 @@ const teamMenu = document.getElementById("teamMenu");
 
 profileBtn.addEventListener("click", () => {
     teamMenu.classList.toggle("show");
+});
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest(".profile-wrapper")) {
+        teamMenu.classList.remove("show");
+    }
 });
 
 

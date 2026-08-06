@@ -130,6 +130,14 @@
 
 <div class="container">
 
+<nav class="breadcrumb" id="breadcrumb">
+    <span class="breadcrumb-item breadcrumb-home" onclick="resetBreadcrumb()">
+        <i class="fa-solid fa-house"></i> Dashboard
+    </span>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-item breadcrumb-current" id="breadcrumbCurrent">All Students</span>
+</nav>
+
 <div class="top">
 <div class="search-wrapper">
     <input type="text" id="search" placeholder="Search Student..." autocomplete="off">
@@ -142,20 +150,48 @@ Add Student
 </button>
 </div>
 
-<div class="cards">
-<div class="card">
-<h2 id="totalStudents">0</h2>
-<p>Total Students</p>
+<div class="hero">
+<div class="hero-glow"></div>
+<div class="hero-top">
+<div class="hero-icon"><i class="fa-solid fa-user-graduate"></i></div>
+<div class="hero-copy">
+<h2>Student Management System</h2>
+<p>Manage all students in one place</p>
+</div>
 </div>
 
-<div class="card">
-<h2 id="maleCount">0</h2>
-<p>Male</p>
+<div class="hero-stats">
+<div class="hero-stat" onclick="showStatPopup('all')">
+<div class="hero-stat-icon stat-blue"><i class="fa-solid fa-chart-simple"></i></div>
+<div class="hero-stat-text">
+<h3 id="totalStudents">0</h3>
+<span>Total Students</span>
+</div>
 </div>
 
-<div class="card">
-<h2 id="femaleCount">0</h2>
-<p>Female</p>
+<div class="hero-stat" onclick="showStatPopup('male')">
+<div class="hero-stat-icon stat-cyan"><i class="fa-solid fa-person"></i></div>
+<div class="hero-stat-text">
+<h3 id="maleCount">0</h3>
+<span>Boys</span>
+</div>
+</div>
+
+<div class="hero-stat" onclick="showStatPopup('female')">
+<div class="hero-stat-icon stat-pink"><i class="fa-solid fa-person-dress"></i></div>
+<div class="hero-stat-text">
+<h3 id="femaleCount">0</h3>
+<span>Girls</span>
+</div>
+</div>
+
+<div class="hero-stat" onclick="showStatPopup('dept')">
+<div class="hero-stat-icon stat-purple"><i class="fa-solid fa-building"></i></div>
+<div class="hero-stat-text">
+<h3 id="deptCount">0</h3>
+<span>Departments</span>
+</div>
+</div>
 </div>
 </div>
 
@@ -213,8 +249,8 @@ Add Student
 </select>
 
 <div class="buttons">
-<button id="saveBtn">Save</button>
 <button id="closeBtn">Cancel</button>
+<button id="saveBtn">Save</button>
 </div>
 
 </div>
@@ -240,6 +276,14 @@ Add Student
     <div class="profile-box">
         <span id="closeStudentInfo">&times;</span>
         <div id="studentInfoContent"></div>
+    </div>
+</div>
+
+<div id="statListPopup" class="profile-popup">
+    <div class="profile-box stat-list-box">
+        <span id="closeStatList">&times;</span>
+        <h2 id="statListTitle">Students</h2>
+        <div id="statListContent" class="stat-list-content"></div>
     </div>
 </div>
 
