@@ -827,6 +827,42 @@ document.addEventListener("click", (e) => {
     }
 });
 
+/* ===== Install App (browser only, hidden inside the installed app) ===== */
+
+const installAppBtn = document.getElementById("installAppBtn");
+let deferredInstallPrompt = null;
+
+function isRunningAsInstalledApp() {
+    return window.matchMedia("(display-mode: standalone)").matches
+        || window.navigator.standalone === true; // iOS home-screen apps
+}
+
+if (!isRunningAsInstalledApp()) {
+    window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        installAppBtn.style.display = "flex";
+    });
+}
+
+installAppBtn.addEventListener("click", () => {
+    teamMenu.classList.remove("show");
+
+    if (!deferredInstallPrompt) return;
+
+    deferredInstallPrompt.prompt();
+
+    deferredInstallPrompt.userChoice.finally(() => {
+        deferredInstallPrompt = null;
+        installAppBtn.style.display = "none";
+    });
+});
+
+window.addEventListener("appinstalled", () => {
+    installAppBtn.style.display = "none";
+    deferredInstallPrompt = null;
+});
+
 
 
 function showProfile(person) {

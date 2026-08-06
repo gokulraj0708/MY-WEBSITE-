@@ -1485,6 +1485,18 @@ header{
     color:#fff;
 }
 
+.team-action-install:hover{
+    background:#00b894;
+}
+
+.team-action-install i{
+    color:#00b894;
+}
+
+.team-action-install:hover i{
+    color:#fff;
+}
+
 /* ================= GOOGLE SIGN-IN ================= */
 
 .auth-divider{
