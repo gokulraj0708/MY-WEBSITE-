@@ -8,20 +8,69 @@ const saveBtn = document.getElementById("saveBtn");
 const nameInput = document.getElementById("name");
 const deptInput = document.getElementById("dept");
 const deptOtherInput = document.getElementById("deptOther");
+const degreeInput = document.getElementById("degree");
+const degreeOtherInput = document.getElementById("degreeOther");
 const yearInput = document.getElementById("year");
 const regnoInput = document.getElementById("regno");
 const mobileInput = document.getElementById("mobile");
 const genderInput = document.getElementById("gender");
 
-const knownDepts = ["Bsc.cs.Ai", "Bsc.cs", "B.com", "Ba.English", "Ba.Tamil"];
+// Department -> list of degrees offered under it. "Others" (when present)
+// lets the user type a custom degree; departments without "Others" only
+// offer the degrees listed.
+const deptDegreeMap = {
+    "COMPUTER SCIENCE": ["B.Sc.cs.Ai", "B.Sc.cs", "Others"],
+    "COMPUTER APPLICATIONS": ["BCA", "Others"],
+    "COMMERCE": ["B.Com(General)", "B.com.cs", "Others"],
+    "MATHEMATICS": ["B.Sc Mathematics", "Others"],
+    "BUSINESS ADMINISTRATION": ["BBA", "Others"],
+    "தமிழ்": ["B.a.Tamil", "Others"],
+    "ENGLISH": ["B.a.English"]
+};
+
+function populateDegreeOptions(department) {
+    const degrees = deptDegreeMap[department] || [];
+
+    degreeInput.innerHTML = `<option value="" disabled selected>Select Degree</option>` +
+        degrees.map((d) => `<option value="${d}">${d}</option>`).join("");
+
+    degreeInput.style.display = degrees.length ? "block" : "none";
+    degreeOtherInput.style.display = "none";
+    degreeOtherInput.value = "";
+}
+
+function findDepartmentForDegree(degreeValue) {
+    for (const department in deptDegreeMap) {
+        if (deptDegreeMap[department].includes(degreeValue)) {
+            return department;
+        }
+    }
+    return null;
+}
 
 deptInput.addEventListener("change", () => {
     if (deptInput.value === "Others") {
         deptOtherInput.style.display = "block";
         deptOtherInput.focus();
+
+        degreeInput.style.display = "none";
+        degreeInput.innerHTML = `<option value="" disabled selected>Select Degree</option>`;
+        degreeOtherInput.style.display = "none";
+        degreeOtherInput.value = "";
     } else {
         deptOtherInput.style.display = "none";
         deptOtherInput.value = "";
+        populateDegreeOptions(deptInput.value);
+    }
+});
+
+degreeInput.addEventListener("change", () => {
+    if (degreeInput.value === "Others") {
+        degreeOtherInput.style.display = "block";
+        degreeOtherInput.focus();
+    } else {
+        degreeOtherInput.style.display = "none";
+        degreeOtherInput.value = "";
     }
 });
 
@@ -338,6 +387,8 @@ function studentsCollection() {
 
 let lastDept = "";
 let lastDeptOther = "";
+let lastDegree = "";
+let lastDegreeOther = "";
 
 addBtn.onclick = () => {
     editId = null;
@@ -353,9 +404,14 @@ closeBtn.onclick = () => {
 
 saveBtn.onclick = () => {
 
-    const dept = deptInput.value === "Others"
-        ? deptOtherInput.value.trim()
-        : deptInput.value;
+    let dept = "";
+    if (deptInput.value === "Others") {
+        dept = deptOtherInput.value.trim();
+    } else if (degreeInput.value === "Others") {
+        dept = degreeOtherInput.value.trim();
+    } else {
+        dept = degreeInput.value || "";
+    }
 
     const regno = regnoInput.value.trim();
 
@@ -400,6 +456,8 @@ saveBtn.onclick = () => {
 
     lastDept = deptInput.value;
     lastDeptOther = deptOtherInput.value.trim();
+    lastDegree = degreeInput.value;
+    lastDegreeOther = degreeOtherInput.value.trim();
 
     popup.classList.remove("active");
     clearForm();
@@ -411,6 +469,10 @@ function clearForm(prefillDept = false) {
     nameInput.value = "";
     deptOtherInput.value = "";
     deptOtherInput.style.display = "none";
+    degreeOtherInput.value = "";
+    degreeOtherInput.style.display = "none";
+    degreeInput.innerHTML = `<option value="" disabled selected>Select Degree</option>`;
+    degreeInput.style.display = "none";
     yearInput.value = "";
     regnoInput.value = "";
     mobileInput.value = "";
@@ -418,9 +480,21 @@ function clearForm(prefillDept = false) {
 
     if (prefillDept && lastDept) {
         deptInput.value = lastDept;
+
         if (lastDept === "Others") {
             deptOtherInput.style.display = "block";
             deptOtherInput.value = lastDeptOther;
+        } else {
+            populateDegreeOptions(lastDept);
+
+            if (lastDegree) {
+                degreeInput.value = lastDegree;
+
+                if (lastDegree === "Others") {
+                    degreeOtherInput.style.display = "block";
+                    degreeOtherInput.value = lastDegreeOther;
+                }
+            }
         }
     } else {
         deptInput.value = "";
@@ -542,14 +616,26 @@ function editStudent(id){
 
     nameInput.value = student.name;
 
-    if (knownDepts.includes(student.dept)) {
-        deptInput.value = student.dept;
+    const matchedDept = findDepartmentForDegree(student.dept);
+
+    if (matchedDept) {
+        deptInput.value = matchedDept;
         deptOtherInput.style.display = "none";
         deptOtherInput.value = "";
+
+        populateDegreeOptions(matchedDept);
+        degreeInput.value = student.dept;
+        degreeOtherInput.style.display = "none";
+        degreeOtherInput.value = "";
     } else {
         deptInput.value = "Others";
         deptOtherInput.style.display = "block";
         deptOtherInput.value = student.dept;
+
+        degreeInput.style.display = "none";
+        degreeInput.innerHTML = `<option value="" disabled selected>Select Degree</option>`;
+        degreeOtherInput.style.display = "none";
+        degreeOtherInput.value = "";
     }
 
     yearInput.value = student.year || "";
@@ -634,7 +720,7 @@ function showStudentInfo(id) {
 
     info.innerHTML = `
         <h2>${student.name}</h2>
-        <p><b>Department:</b> ${student.dept}</p>
+        <p><b>Degree:</b> ${student.dept}</p>
         <p><b>Year:</b> ${student.year || "-"}</p>
         <p><b>Reg. No.:</b> ${student.regno || "Not added"}</p>
         <p><b>Mobile No.:</b> <a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></p>
@@ -661,7 +747,7 @@ function showStatPopup(type) {
 
     if (type === "dept") {
 
-        title.textContent = "Departments";
+        title.textContent = "Degrees";
 
         const deptMap = {};
         students.forEach((s) => {
@@ -675,7 +761,7 @@ function showStatPopup(type) {
         );
 
         content.innerHTML = deptNames.length === 0
-            ? `<p class="stat-list-empty">No departments yet.</p>`
+            ? `<p class="stat-list-empty">No degrees yet.</p>`
             : deptNames.map((d) => `
                 <div class="stat-list-item" onclick="filterByDept('${d.replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-building"></i>
@@ -794,6 +880,14 @@ window.onclick = (e)=>{
         e.target.classList.remove("active");
     }
 
+    if(e.target===document.getElementById("exportPopup")){
+        e.target.classList.remove("active");
+    }
+
+    if(e.target===document.getElementById("importPopup")){
+        e.target.classList.remove("active");
+    }
+
 };
 
 
@@ -891,3 +985,362 @@ function showProfile(person) {
 document.getElementById("closeProfile").onclick = function () {
     document.getElementById("profilePopup").classList.remove("active");
 };
+
+/* ============================================================
+   EXPORT / IMPORT — Student data as a shareable PDF
+   ------------------------------------------------------------
+   The PDF shown to the user is a clean, formatted report.
+   Hidden on an extra page (white text, tiny font — invisible
+   when viewed or printed) is the exact structured student data,
+   base64-encoded and wrapped in marker tags. When that same PDF
+   is chosen via "Import" — on this device or any other account —
+   we read the hidden block back out with pdf.js and recreate the
+   students exactly, no fragile "guess it from the layout" text
+   parsing involved.
+   ============================================================ */
+
+const DATA_MARKER_START = "###SMS-STUDENT-DATA-START###";
+const DATA_MARKER_END   = "###SMS-STUDENT-DATA-END###";
+
+const exportBtn = document.getElementById("exportBtn");
+const importBtn = document.getElementById("importBtn");
+const importFileInput = document.getElementById("importFileInput");
+
+const exportPopup = document.getElementById("exportPopup");
+const exportDeptSelect = document.getElementById("exportDept");
+const exportSummary = document.getElementById("exportSummary");
+const exportCancelBtn = document.getElementById("exportCancelBtn");
+const exportShareBtn = document.getElementById("exportShareBtn");
+const exportDownloadBtn = document.getElementById("exportDownloadBtn");
+
+if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+/* ---------- unicode-safe base64 helpers ---------- */
+
+function base64EncodeUnicode(str) {
+    return btoa(
+        encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, hex) =>
+            String.fromCharCode(parseInt(hex, 16))
+        )
+    );
+}
+
+function base64DecodeUnicode(b64) {
+    return decodeURIComponent(
+        atob(b64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+    );
+}
+
+/* ---------- export ---------- */
+
+function getExportDeptOptions() {
+    const depts = new Set(
+        students.map((s) => (s.dept || "").trim()).filter((d) => d !== "")
+    );
+    return [...depts].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function getFilteredExportList() {
+    const dept = exportDeptSelect.value;
+    return dept ? students.filter((s) => s.dept === dept) : students;
+}
+
+function updateExportSummary() {
+    const list = getFilteredExportList();
+    exportSummary.textContent = `${list.length} student${list.length === 1 ? "" : "s"} will be exported`;
+}
+
+if (exportBtn) {
+    exportBtn.onclick = () => {
+        teamMenu.classList.remove("show");
+
+        exportDeptSelect.innerHTML = `<option value="">All Degrees</option>` +
+            getExportDeptOptions()
+                .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+                .join("");
+
+        updateExportSummary();
+        exportPopup.classList.add("active");
+    };
+}
+
+if (exportDeptSelect) {
+    exportDeptSelect.addEventListener("change", updateExportSummary);
+}
+
+if (exportCancelBtn) {
+    exportCancelBtn.onclick = () => {
+        exportPopup.classList.remove("active");
+    };
+}
+
+function embedStudentData(doc, list) {
+    const payload = {
+        app: "SMS-EXPORT",
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        students: list.map((s) => ({
+            name: s.name,
+            dept: s.dept,
+            year: s.year || "",
+            regno: s.regno || "",
+            mobile: s.mobile,
+            gender: s.gender
+        }))
+    };
+
+    const encoded = base64EncodeUnicode(JSON.stringify(payload));
+    const marker = DATA_MARKER_START + encoded + DATA_MARKER_END;
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const lineHeight = 1.7;
+
+    doc.addPage();
+    doc.setFont("courier", "normal");
+    doc.setFontSize(4);
+    doc.setTextColor(255, 255, 255); // white on white = invisible, but still present as real text
+
+    const lines = doc.splitTextToSize(marker, pageWidth - margin * 2);
+
+    let y = margin;
+    lines.forEach((line) => {
+        if (y > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+        }
+        doc.text(line, margin, y);
+        y += lineHeight;
+    });
+}
+
+function generateStudentsPDF(list, deptLabel) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Student Management System", 14, 18);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`${deptLabel} — ${list.length} student${list.length === 1 ? "" : "s"}`, 14, 26);
+    doc.text(`Exported on ${new Date().toLocaleDateString()}`, 14, 32);
+
+    doc.autoTable({
+        startY: 38,
+        head: [["Name", "Degree", "Year", "Reg. No.", "Mobile", "Gender"]],
+        body: [...list]
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+            .map((s) => [s.name, s.dept, s.year || "-", s.regno || "-", s.mobile, s.gender]),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [37, 117, 252] },
+        alternateRowStyles: { fillColor: [245, 247, 255] }
+    });
+
+    embedStudentData(doc, list);
+
+    return doc;
+}
+
+function exportFileName(deptLabel) {
+    const safe = deptLabel.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    return `students_${safe || "all"}.pdf`;
+}
+
+if (exportDownloadBtn) {
+    exportDownloadBtn.onclick = () => {
+        const list = getFilteredExportList();
+        if (list.length === 0) {
+            alert("No students to export for this selection.");
+            return;
+        }
+        const deptLabel = exportDeptSelect.value || "All Degrees";
+        const doc = generateStudentsPDF(list, deptLabel);
+        doc.save(exportFileName(deptLabel));
+        exportPopup.classList.remove("active");
+    };
+}
+
+if (exportShareBtn) {
+    exportShareBtn.onclick = async () => {
+        const list = getFilteredExportList();
+        if (list.length === 0) {
+            alert("No students to export for this selection.");
+            return;
+        }
+        const deptLabel = exportDeptSelect.value || "All Degrees";
+        const doc = generateStudentsPDF(list, deptLabel);
+        const fileName = exportFileName(deptLabel);
+        const blob = doc.output("blob");
+        const file = new File([blob], fileName, { type: "application/pdf" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: "Student List",
+                    text: `${deptLabel} — ${list.length} student${list.length === 1 ? "" : "s"}`
+                });
+            } catch (err) {
+                if (err.name !== "AbortError") {
+                    alert("Couldn't share the file. Try Download instead.");
+                }
+            }
+        } else {
+            alert("Sharing isn't supported on this device/browser. Use Download instead, then share the PDF yourself.");
+            return;
+        }
+
+        exportPopup.classList.remove("active");
+    };
+}
+
+/* ---------- import ---------- */
+
+const importPopup = document.getElementById("importPopup");
+const importCancelBtn = document.getElementById("importCancelBtn");
+const openFileManagerBtn = document.getElementById("openFileManagerBtn");
+
+if (importBtn) {
+    importBtn.onclick = () => {
+        teamMenu.classList.remove("show");
+        importPopup.classList.add("active");
+    };
+}
+
+if (importCancelBtn) {
+    importCancelBtn.onclick = () => {
+        importPopup.classList.remove("active");
+    };
+}
+
+if (openFileManagerBtn) {
+    openFileManagerBtn.onclick = () => {
+        importPopup.classList.remove("active");
+        importFileInput.value = "";
+        importFileInput.click();
+    };
+}
+
+async function extractPdfText(arrayBuffer) {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map((item) => item.str).join("") + "\n";
+    }
+
+    return fullText;
+}
+
+function parseEmbeddedStudentData(fullText) {
+    const startIdx = fullText.indexOf(DATA_MARKER_START);
+    const endIdx = fullText.indexOf(DATA_MARKER_END);
+
+    if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) {
+        return null;
+    }
+
+    const encoded = fullText.slice(startIdx + DATA_MARKER_START.length, endIdx);
+
+    try {
+        const json = base64DecodeUnicode(encoded);
+        const payload = JSON.parse(json);
+        if (!payload || payload.app !== "SMS-EXPORT" || !Array.isArray(payload.students)) {
+            return null;
+        }
+        return payload.students;
+    } catch (err) {
+        return null;
+    }
+}
+
+async function importStudentsFromList(importedStudents) {
+    const existingMobiles = new Set(students.map((s) => (s.mobile || "").trim()));
+
+    let added = 0;
+    let skipped = 0;
+    let invalid = 0;
+
+    for (const raw of importedStudents) {
+        const student = {
+            name: (raw.name || "").trim(),
+            dept: (raw.dept || "").trim(),
+            year: (raw.year || "").trim(),
+            regno: (raw.regno || "").trim(),
+            mobile: (raw.mobile || "").trim(),
+            gender: raw.gender === "Female" ? "Female" : "Male"
+        };
+
+        if (!student.name || !student.dept || !student.mobile || !/^\d{10}$/.test(student.mobile)) {
+            invalid++;
+            continue;
+        }
+
+        if (existingMobiles.has(student.mobile)) {
+            skipped++;
+            continue;
+        }
+
+        try {
+            await studentsCollection().add(student);
+            existingMobiles.add(student.mobile);
+            added++;
+        } catch (err) {
+            invalid++;
+        }
+    }
+
+    return { added, skipped, invalid };
+}
+
+if (importFileInput) {
+    importFileInput.addEventListener("change", async () => {
+        const file = importFileInput.files[0];
+        if (!file) return;
+
+        if (!currentUser) {
+            alert("Please log in first.");
+            return;
+        }
+
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const fullText = await extractPdfText(arrayBuffer);
+            const importedStudents = parseEmbeddedStudentData(fullText);
+
+            if (!importedStudents) {
+                alert("This PDF doesn't contain importable student data. Make sure it was exported from this app's Export button.");
+                return;
+            }
+
+            if (importedStudents.length === 0) {
+                alert("This file has no students to import.");
+                return;
+            }
+
+            const { added, skipped, invalid } = await importStudentsFromList(importedStudents);
+
+            let message = `Imported ${added} student${added === 1 ? "" : "s"}.`;
+            if (skipped > 0) message += ` Skipped ${skipped} already in your list.`;
+            if (invalid > 0) message += ` ${invalid} had invalid data and were skipped.`;
+            alert(message);
+
+        } catch (err) {
+            console.error("Import error:", err);
+            alert("Couldn't read that PDF. Please make sure it's a valid file exported from this app.");
+        } finally {
+            importFileInput.value = "";
+        }
+    });
+}

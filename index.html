@@ -25,6 +25,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <!-- PDF Export (jsPDF + autoTable) and PDF Import reading (pdf.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 
 <body>
@@ -149,10 +154,24 @@
     <div id="searchSuggestions"></div>
 </div>
 
+<div class="top-actions">
 <button id="addBtn">
 <i class="fa-solid fa-plus"></i>
 Add Student
 </button>
+
+<button id="exportBtn" class="action-btn-with-text" title="Export Students">
+<i class="fa-solid fa-file-export"></i>
+<span class="btn-text">Export</span>
+</button>
+
+<button id="importBtn" class="action-btn-with-text" title="Import Students">
+<i class="fa-solid fa-file-import"></i>
+<span class="btn-text">Import</span>
+</button>
+
+<input type="file" id="importFileInput" accept="application/pdf,.pdf" style="display:none;">
+</div>
 </div>
 
 <div class="hero">
@@ -194,7 +213,7 @@ Add Student
 <div class="hero-stat-icon stat-purple"><i class="fa-solid fa-building"></i></div>
 <div class="hero-stat-text">
 <h3 id="deptCount">0</h3>
-<span>Departments</span>
+<span>Degrees</span>
 </div>
 </div>
 </div>
@@ -205,7 +224,7 @@ Add Student
 <thead>
 <tr>
 <th>Name</th>
-<th>Department</th>
+<th>Degree</th>
 <th>Mobile No.</th>
 <th>Gender</th>
 <th>Actions</th>
@@ -227,15 +246,23 @@ Add Student
 
 <select id="dept">
 <option value="" disabled selected>Select Department</option>
-<option value="Bsc.cs.Ai">Bsc.cs.Ai</option>
-<option value="Bsc.cs">Bsc.cs</option>
-<option value="B.com">B.com</option>
-<option value="Ba.English">Ba.English</option>
-<option value="Ba.Tamil">Ba.Tamil</option>
+<option value="COMPUTER SCIENCE">COMPUTER SCIENCE</option>
+<option value="COMPUTER APPLICATIONS">COMPUTER APPLICATIONS</option>
+<option value="COMMERCE">COMMERCE</option>
+<option value="MATHEMATICS">MATHEMATICS</option>
+<option value="BUSINESS ADMINISTRATION">BUSINESS ADMINISTRATION</option>
+<option value="தமிழ்">தமிழ்</option>
+<option value="ENGLISH">ENGLISH</option>
 <option value="Others">Others</option>
 </select>
 
 <input type="text" id="deptOther" placeholder="Enter department" style="display:none;">
+
+<select id="degree" style="display:none;">
+<option value="" disabled selected>Select Degree</option>
+</select>
+
+<input type="text" id="degreeOther" placeholder="Enter degree" style="display:none;">
 
 <select id="year">
 <option value="" disabled selected>Select Year</option>
@@ -257,6 +284,45 @@ Add Student
 <button id="closeBtn">Cancel</button>
 <button id="saveBtn">Save</button>
 </div>
+
+</div>
+</div>
+
+<!-- Export Popup -->
+<div class="popup" id="exportPopup">
+<div class="popup-content">
+<h2><i class="fa-solid fa-file-export"></i> Export Students</h2>
+
+<select id="exportDept">
+<option value="">All Degrees</option>
+</select>
+
+<p id="exportSummary" class="export-summary"></p>
+
+<div class="buttons export-buttons">
+<button id="exportCancelBtn" type="button">Cancel</button>
+<button id="exportShareBtn" type="button"><i class="fa-solid fa-share-nodes"></i> Share</button>
+<button id="exportDownloadBtn" type="button"><i class="fa-solid fa-download"></i> Download</button>
+</div>
+
+<p class="export-hint">Share sends a ready-to-view PDF via WhatsApp, Email, etc. The same PDF can be imported into another account on this app — the exact student data travels with it.</p>
+
+</div>
+</div>
+
+<!-- Import Popup -->
+<div class="popup" id="importPopup">
+<div class="popup-content">
+<h2><i class="fa-solid fa-file-import"></i> Import Student Information</h2>
+
+<p class="import-message">Do you want to add student information from a PDF file?</p>
+
+<div class="buttons import-buttons">
+<button id="importCancelBtn" type="button">Cancel</button>
+<button id="openFileManagerBtn" type="button"><i class="fa-solid fa-folder-open"></i> Open File Manager</button>
+</div>
+
+<p class="import-note"><i class="fa-solid fa-circle-info"></i> Note: Only import PDFs that were exported by another user from this app.</p>
 
 </div>
 </div>
