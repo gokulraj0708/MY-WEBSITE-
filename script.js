@@ -41,7 +41,7 @@ const themeBtn = document.getElementById("themeBtn");
 
 let students = [];
 let currentVisibleList = students;
-let editIndex = -1;
+let editId = null;
 let currentUser = null;
 let unsubscribeStudents = null; // Firestore real-time listener
 
@@ -155,6 +155,8 @@ forgotPasswordLink.onclick = (e) => {
 const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 
 resetPasswordBtn.onclick = () => {
+    teamMenu.classList.remove("show");
+
     if (!currentUser || !currentUser.email) return;
 
     const usesPassword = currentUser.providerData.some(
@@ -180,6 +182,7 @@ resetPasswordBtn.onclick = () => {
 };
 
 logoutBtn.onclick = () => {
+    teamMenu.classList.remove("show");
     logoutConfirmOverlay.classList.add("active");
 };
 
@@ -234,16 +237,25 @@ auth.onAuthStateChanged((user) => {
         // Show placeholders while Firestore fetches this user's data.
         renderSkeleton();
 
-        // Real-time listener: keeps this user's data in sync
-        // across every device, live, no manual refresh needed.
-        unsubscribeStudents = db.collection("students")
-            .doc(user.uid)
-            .onSnapshot((doc) => {
-                students = doc.exists ? (doc.data().list || []) : [];
-                renderStudents();
-            }, (err) => {
-                console.error("Sync error:", err);
-            });
+        // One-time migration: older accounts stored every student as a
+        // single array field. Copy those into individual documents (once)
+        // so simultaneous logins can never overwrite each other's edits.
+        migrateOldStudentsIfNeeded(user.uid).finally(() => {
+
+            // Real-time listener: keeps this user's data in sync
+            // across every device, live, no manual refresh needed.
+            unsubscribeStudents = db.collection("students")
+                .doc(user.uid)
+                .collection("list")
+                .onSnapshot((snapshot) => {
+                    students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+                    renderStudents();
+                }, (err) => {
+                    console.error("Sync error:", err);
+                    renderLoadError(err);
+                });
+
+        });
     } else {
         appContent.style.display = "none";
         authScreen.style.display = "flex";
@@ -289,11 +301,37 @@ document.getElementById("closeLoginWelcome").onclick = function () {
     document.getElementById("loginWelcomePopup").classList.remove("active");
 };
 
-function saveStudentsToCloud() {
-    if (!currentUser) return;
-    db.collection("students").doc(currentUser.uid).set({
-        list: students
+function migrateOldStudentsIfNeeded(uid) {
+    const oldDocRef = db.collection("students").doc(uid);
+    const listRef = oldDocRef.collection("list");
+
+    return oldDocRef.get().then((oldDoc) => {
+        if (!oldDoc.exists) return;
+
+        const oldList = oldDoc.data().list;
+        if (!Array.isArray(oldList) || oldList.length === 0) return;
+
+        // Only migrate if the new subcollection is still empty, so this
+        // never runs twice or duplicates anyone's students.
+        return listRef.limit(1).get().then((existing) => {
+            if (!existing.empty) return;
+
+            const batch = db.batch();
+            oldList.forEach((student) => {
+                batch.set(listRef.doc(), student);
+            });
+
+            return batch.commit().then(() =>
+                oldDocRef.update({ list: firebase.firestore.FieldValue.delete() })
+            );
+        });
+    }).catch((err) => {
+        console.error("Migration error:", err);
     });
+}
+
+function studentsCollection() {
+    return db.collection("students").doc(currentUser.uid).collection("list");
 }
 
 
@@ -302,7 +340,7 @@ let lastDept = "";
 let lastDeptOther = "";
 
 addBtn.onclick = () => {
-    editIndex = -1;
+    editId = null;
     clearForm(true);
     popup.classList.add("active");
 };
@@ -350,21 +388,21 @@ saveBtn.onclick = () => {
         return;
     }
 
-    if (editIndex === -1) {
-        students.push(student);
-    } else {
-        students[editIndex] = student;
-        editIndex = -1;
-    }
+    const savePromise = editId === null
+        ? studentsCollection().add(student)
+        : studentsCollection().doc(editId).update(student);
+
+    savePromise.catch(() => {
+        alert("Could not save. Please check your connection and try again.");
+    });
+
+    editId = null;
 
     lastDept = deptInput.value;
     lastDeptOther = deptOtherInput.value.trim();
 
-    saveStudentsToCloud();
-
     popup.classList.remove("active");
     clearForm();
-    renderStudents();
 };
 
 
@@ -408,6 +446,28 @@ function renderSkeleton(rows = 4) {
 
 }
 
+function renderLoadError(err) {
+
+    const message = err && err.code === "permission-denied"
+        ? "Access denied. Your Firestore security rules may need updating for this account."
+        : "Couldn't load your students. Check your connection and try again.";
+
+    table.innerHTML = `
+        <tr>
+            <td colspan="5" class="table-error">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                ${message}
+            </td>
+        </tr>
+    `;
+
+    [totalStudents, maleCount, femaleCount, deptCount].forEach((el) => {
+        el.classList.remove("skeleton-num");
+        el.innerText = "–";
+    });
+
+}
+
 function renderStudents(list = students) {
 
     currentVisibleList = list;
@@ -430,8 +490,6 @@ function renderStudents(list = students) {
 
     sortedList.forEach((student) => {
 
-        const realIndex = students.indexOf(student);
-
         if(student.gender === "Male"){
             male++;
         }else{
@@ -440,19 +498,19 @@ function renderStudents(list = students) {
 
         table.innerHTML += `
         <tr class="fade-row">
-            <td><a href="#" class="name-link" onclick="showStudentInfo(${realIndex}); return false;">${student.name}</a></td>
+            <td><a href="#" class="name-link" onclick="showStudentInfo('${student.id}'); return false;">${student.name}</a></td>
             <td>${student.dept}</td>
             <td><a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></td>
             <td>${student.gender}</td>
 
             <td>
                 <button class="action-btn edit-btn"
-                onclick="editStudent(${realIndex})">
+                onclick="editStudent('${student.id}')">
                 <i class="fa-solid fa-pen"></i>
                 </button>
 
                 <button class="action-btn delete-btn"
-                onclick="deleteStudent(${realIndex})">
+                onclick="deleteStudent('${student.id}')">
                 <i class="fa-solid fa-trash"></i>
                 </button>
             </td>
@@ -475,41 +533,42 @@ function renderStudents(list = students) {
 }
 
 
-function editStudent(index){
+function editStudent(id){
+
+    const student = students.find((s) => s.id === id);
+    if (!student) return;
 
     popup.classList.add("active");
 
-    nameInput.value = students[index].name;
+    nameInput.value = student.name;
 
-    if (knownDepts.includes(students[index].dept)) {
-        deptInput.value = students[index].dept;
+    if (knownDepts.includes(student.dept)) {
+        deptInput.value = student.dept;
         deptOtherInput.style.display = "none";
         deptOtherInput.value = "";
     } else {
         deptInput.value = "Others";
         deptOtherInput.style.display = "block";
-        deptOtherInput.value = students[index].dept;
+        deptOtherInput.value = student.dept;
     }
 
-    yearInput.value = students[index].year || "";
-    regnoInput.value = students[index].regno || "";
-    mobileInput.value = students[index].mobile;
-    genderInput.value = students[index].gender;
+    yearInput.value = student.year || "";
+    regnoInput.value = student.regno || "";
+    mobileInput.value = student.mobile;
+    genderInput.value = student.gender;
 
-    editIndex = index;
+    editId = id;
 
 }
 
 
-function deleteStudent(index){
+function deleteStudent(id){
 
     if(confirm("Delete this student?")){
 
-        students.splice(index,1);
-
-        saveStudentsToCloud();
-
-        renderStudents();
+        studentsCollection().doc(id).delete().catch(() => {
+            alert("Could not delete. Please check your connection and try again.");
+        });
 
     }
 
@@ -550,8 +609,7 @@ search.addEventListener("keyup", () => {
     }
 
     searchSuggestions.innerHTML = nameMatches.map(student => {
-        const realIndex = students.indexOf(student);
-        return `<div class="suggestion-item" onclick="showStudentInfo(${realIndex})">
+        return `<div class="suggestion-item" onclick="showStudentInfo('${student.id}')">
                     <i class="fa-solid fa-user"></i> ${student.name}
                 </div>`;
     }).join("");
@@ -566,9 +624,9 @@ document.addEventListener("click", (e) => {
     }
 });
 
-function showStudentInfo(index) {
+function showStudentInfo(id) {
 
-    const student = students[index];
+    const student = students.find((s) => s.id === id);
     if (!student) return;
 
     const popup = document.getElementById("studentInfoPopup");
@@ -646,9 +704,8 @@ function showStatPopup(type) {
         content.innerHTML = sorted.length === 0
             ? `<p class="stat-list-empty">No students yet.</p>`
             : sorted.map((s) => {
-                const realIndex = students.indexOf(s);
                 return `
-                <div class="stat-list-item" onclick="openStudentFromStatList(${realIndex})">
+                <div class="stat-list-item" onclick="openStudentFromStatList('${s.id}')">
                     <i class="fa-solid fa-user"></i>
                     <span>${s.name}</span>
                     <b>${s.dept}</b>
@@ -660,9 +717,9 @@ function showStatPopup(type) {
 
 }
 
-function openStudentFromStatList(index) {
+function openStudentFromStatList(id) {
     document.getElementById("statListPopup").classList.remove("active");
-    showStudentInfo(index);
+    showStudentInfo(id);
 }
 
 function filterByDept(dept) {
@@ -765,7 +822,7 @@ profileBtn.addEventListener("click", () => {
 });
 
 document.addEventListener("click", (e) => {
-    if (!e.target.closest(".profile-wrapper")) {
+    if (!e.target.closest(".profile-wrapper") && !e.target.closest("#profilePopup")) {
         teamMenu.classList.remove("show");
     }
 });

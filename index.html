@@ -86,14 +86,6 @@
     <h1>STUDENT MANAGEMENT SYSTEM</h1>
 
     <div>
-        <button id="logoutBtn" title="Logout">
-            <i class="fa-solid fa-right-from-bracket"></i>
-        </button>
-
-        <button id="resetPasswordBtn" title="Reset Password">
-            <i class="fa-solid fa-key"></i>
-        </button>
-
         <button id="themeBtn">
             <i class="fa-solid fa-moon"></i>
         </button>
@@ -108,6 +100,16 @@
                     <i class="fa-solid fa-circle-user"></i>
                     <span id="currentUserName">User</span>
                 </div>
+
+                <div class="team-actions">
+                    <button class="team-action-btn" id="resetPasswordBtn">
+                        <i class="fa-solid fa-key"></i> Reset Password
+                    </button>
+                    <button class="team-action-btn team-action-danger" id="logoutBtn">
+                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                    </button>
+                </div>
+
                 <p>created by</p>
                 <div class="member" onclick="showProfile('hari')">
                     <img src="Snapchat-1003517570.jpg" class="profile-img">
@@ -330,6 +332,16 @@ Add Student
             });
         });
     }
+
+    // Auto-hide welcome screen after 2.5 seconds
+    document.addEventListener('DOMContentLoaded', () => {
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen) {
+            setTimeout(() => {
+                welcomeScreen.classList.add('hide');
+            }, 2500);
+        }
+    });
 </script>
 
 </body>
