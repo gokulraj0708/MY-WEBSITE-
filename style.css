@@ -696,7 +696,7 @@ header > div{
     display:flex;
     width:100%;
     align-items:center;
-    justify-content:center;
+    justify-content:flex-end;
     margin:0;
     gap:15px;
 }
