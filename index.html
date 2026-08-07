@@ -219,6 +219,16 @@ Add Student
 </div>
 </div>
 
+<div class="year-filter-bar">
+<label for="yearFilter"><i class="fa-solid fa-calendar-days"></i> Filter by Year</label>
+<select id="yearFilter">
+<option value="">All Years</option>
+<option value="I">I Year</option>
+<option value="II">II Year</option>
+<option value="III">III Year</option>
+</select>
+</div>
+
 <div class="table-wrapper">
 <table>
 <thead>
@@ -275,6 +285,12 @@ Add Student
 
 <input type="tel" id="mobile" placeholder="Mobile No." maxlength="10">
 
+<input type="email" id="email" placeholder="Email (optional)">
+
+<input type="tel" id="parentMobile" placeholder="Parent's Mobile No. (optional)" maxlength="10">
+
+<input type="text" id="address" placeholder="Address (optional)">
+
 <select id="gender">
 <option>Male</option>
 <option>Female</option>
@@ -295,6 +311,13 @@ Add Student
 
 <select id="exportDept">
 <option value="">All Degrees</option>
+</select>
+
+<select id="exportYear">
+<option value="">All Years</option>
+<option value="I">I Year</option>
+<option value="II">II Year</option>
+<option value="III">III Year</option>
 </select>
 
 <p id="exportSummary" class="export-summary"></p>

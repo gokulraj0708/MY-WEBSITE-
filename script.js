@@ -13,6 +13,9 @@ const degreeOtherInput = document.getElementById("degreeOther");
 const yearInput = document.getElementById("year");
 const regnoInput = document.getElementById("regno");
 const mobileInput = document.getElementById("mobile");
+const emailInput = document.getElementById("email");
+const parentMobileInput = document.getElementById("parentMobile");
+const addressInput = document.getElementById("address");
 const genderInput = document.getElementById("gender");
 
 // Department -> list of degrees offered under it. "Others" (when present)
@@ -40,12 +43,97 @@ function populateDegreeOptions(department) {
 }
 
 function findDepartmentForDegree(degreeValue) {
+    const key = normalizeDeptKey(degreeValue);
+    if (!key) return null;
+
     for (const department in deptDegreeMap) {
-        if (deptDegreeMap[department].includes(degreeValue)) {
-            return department;
-        }
+        const match = deptDegreeMap[department].some(
+            (d) => normalizeDeptKey(d) === key
+        );
+        if (match) return department;
     }
     return null;
+}
+
+// Old data (before the Department -> Degree dropdown existed) was typed
+// freehand, so the same degree can be stored with different spacing,
+// punctuation, or capitalization (e.g. "B.Sc.cs.Ai" vs "Bsc.cs.Ai").
+// This normalizes a degree string into a comparison key so those variants
+// are treated as the same degree everywhere (grouping, sorting, counts,
+// export, filtering) without ever changing the student's stored text.
+function normalizeDeptKey(dept) {
+    return (dept || "")
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+// Groups a list of students by normalized degree key. Each group keeps
+// the first-seen exact spelling as its display label.
+function groupByNormalizedDept(list) {
+    const groups = new Map();
+
+    list.forEach((s) => {
+        const raw = (s.dept || "").trim();
+        const key = normalizeDeptKey(raw);
+
+        if (!groups.has(key)) {
+            groups.set(key, { label: raw || "Unknown Degree", items: [] });
+        }
+
+        groups.get(key).items.push(s);
+    });
+
+    return groups;
+}
+
+// The department dropdown's own order (Computer Science, Computer
+// Applications, Commerce, Mathematics, Business Administration, தமிழ்,
+// English). Everywhere students/degrees are listed, they're grouped by
+// this department order first, then alphabetically by degree within it.
+// Anything that doesn't match a known department (custom "Others" entries,
+// or legacy data) sorts to the very end under "Other".
+const departmentOrder = Object.keys(deptDegreeMap);
+
+function departmentForStudent(dept) {
+    return findDepartmentForDegree(dept) || "Other";
+}
+
+function departmentRank(dept) {
+    const idx = departmentOrder.indexOf(departmentForStudent(dept));
+    return idx === -1 ? departmentOrder.length : idx;
+}
+
+// Year order used everywhere years are grouped or sorted: I -> II -> III,
+// with anything unset/unrecognized sorting last.
+const yearOrder = ["I", "II", "III"];
+
+function yearRank(year) {
+    const idx = yearOrder.indexOf(year);
+    return idx === -1 ? yearOrder.length : idx;
+}
+
+// Sorts by: department (dropdown order) -> degree (alphabetical within
+// that department) -> gender (boys first) -> name.
+function compareByDeptDegree(a, b) {
+    const deptRankCompare = departmentRank(a) - departmentRank(b);
+    if (deptRankCompare !== 0) return deptRankCompare;
+    return normalizeDeptKey(a).localeCompare(normalizeDeptKey(b));
+}
+
+// Sorts by: department -> degree -> year (I, II, III) -> gender (boys
+// first) -> name. Year is sorted ahead of gender so that, within a
+// degree, 1st year and 2nd year students form separate blocks instead of
+// being mixed together.
+function compareByDeptDegreeGenderName(a, b) {
+    const degreeCompare = compareByDeptDegree(a.dept, b.dept);
+    if (degreeCompare !== 0) return degreeCompare;
+
+    const yearCompare = yearRank(a.year) - yearRank(b.year);
+    if (yearCompare !== 0) return yearCompare;
+
+    if (a.gender !== b.gender) return a.gender === "Male" ? -1 : 1;
+
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 }
 
 deptInput.addEventListener("change", () => {
@@ -78,6 +166,10 @@ regnoInput.addEventListener("input", () => {
     regnoInput.value = regnoInput.value.replace(/\D/g, "").slice(0, 20);
 });
 
+parentMobileInput.addEventListener("input", () => {
+    parentMobileInput.value = parentMobileInput.value.replace(/\D/g, "").slice(0, 10);
+});
+
 const table = document.getElementById("studentTable");
 const search = document.getElementById("search");
 
@@ -93,6 +185,55 @@ let currentVisibleList = students;
 let editId = null;
 let currentUser = null;
 let unsubscribeStudents = null; // Firestore real-time listener
+
+// Current table filter state. `currentFilter` tracks the search/degree
+// filter (from the search box or a dashboard drill-down), while
+// `selectedYear` is the independent Year filter — the two combine.
+let selectedYear = "";
+let currentFilter = { type: "all", value: "" }; // type: "all" | "search" | "dept"
+
+function computeFilteredList() {
+    let list = students;
+
+    if (currentFilter.type === "search") {
+        const value = currentFilter.value.toLowerCase();
+        list = list.filter(student =>
+            student.name.toLowerCase().includes(value) ||
+            student.dept.toLowerCase().includes(value)
+        );
+    } else if (currentFilter.type === "dept") {
+        const key = normalizeDeptKey(currentFilter.value);
+        list = list.filter(student => normalizeDeptKey(student.dept) === key);
+    }
+
+    if (selectedYear) {
+        list = list.filter(student => (student.year || "") === selectedYear);
+    }
+
+    return list;
+}
+
+function buildBreadcrumbLabel() {
+    let label = null;
+
+    if (currentFilter.type === "search") {
+        label = `Search: "${currentFilter.value}"`;
+    } else if (currentFilter.type === "dept") {
+        label = currentFilter.value;
+    }
+
+    if (selectedYear) {
+        const yearText = `Year ${selectedYear}`;
+        label = label ? `${label} • ${yearText}` : yearText;
+    }
+
+    return label;
+}
+
+function applyFilters() {
+    renderStudents(computeFilteredList());
+    updateBreadcrumb(buildBreadcrumbLabel());
+}
 
 /* ================= AUTH ================= */
 
@@ -298,7 +439,7 @@ auth.onAuthStateChanged((user) => {
                 .collection("list")
                 .onSnapshot((snapshot) => {
                     students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-                    renderStudents();
+                    applyFilters();
                 }, (err) => {
                     console.error("Sync error:", err);
                     renderLoadError(err);
@@ -309,6 +450,10 @@ auth.onAuthStateChanged((user) => {
         appContent.style.display = "none";
         authScreen.style.display = "flex";
         students = [];
+        selectedYear = "";
+        currentFilter = { type: "all", value: "" };
+        if (yearFilterSelect) yearFilterSelect.value = "";
+        if (search) search.value = "";
         renderStudents();
     }
 
@@ -414,6 +559,9 @@ saveBtn.onclick = () => {
     }
 
     const regno = regnoInput.value.trim();
+    const email = emailInput.value.trim();
+    const parentMobile = parentMobileInput.value.trim();
+    const address = addressInput.value.trim();
 
     const student = {
         name: nameInput.value.trim(),
@@ -421,6 +569,9 @@ saveBtn.onclick = () => {
         year: yearInput.value,
         regno: regno,
         mobile: mobileInput.value.trim(),
+        email: email,
+        parentMobile: parentMobile,
+        address: address,
         gender: genderInput.value
     };
 
@@ -442,6 +593,22 @@ saveBtn.onclick = () => {
     if (regno !== "" && !/^\d{1,20}$/.test(regno)) {
         alert("Reg. No. must contain only numbers (1 to 20 digits).");
         return;
+    }
+
+    if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert("Please enter a valid email address.");
+        return;
+    }
+
+    if (parentMobile !== "") {
+        if (!/^\d{10}$/.test(parentMobile)) {
+            alert("Parent's mobile number must be a valid 10-digit number.");
+            return;
+        }
+        if (parentMobile === student.mobile) {
+            alert("Parent's mobile number must be different from the student's mobile number.");
+            return;
+        }
     }
 
     const savePromise = editId === null
@@ -476,6 +643,9 @@ function clearForm(prefillDept = false) {
     yearInput.value = "";
     regnoInput.value = "";
     mobileInput.value = "";
+    emailInput.value = "";
+    parentMobileInput.value = "";
+    addressInput.value = "";
     genderInput.value = "Male";
 
     if (prefillDept && lastDept) {
@@ -555,12 +725,15 @@ function renderStudents(list = students) {
     let male = 0;
     let female = 0;
 
-    const sortedList = [...list].sort((a, b) => {
-        if (a.gender !== b.gender) {
-            return a.gender === "Female" ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    });
+    // Sort by department (dropdown order), then degree, then gender, then name
+    const sortedList = [...list].sort(compareByDeptDegreeGenderName);
+
+    // Group by department (dropdown order), then by degree, then by year within it
+    let currentDeptCategory = null;
+    let currentDegreeKey = null;
+    let currentYearValue = null;
+    let maleHeader = false;
+    let femaleHeader = false;
 
     sortedList.forEach((student) => {
 
@@ -568,6 +741,77 @@ function renderStudents(list = students) {
             male++;
         }else{
             female++;
+        }
+
+        const studentDeptCategory = departmentForStudent(student.dept);
+        const studentDegreeKey = normalizeDeptKey(student.dept);
+        const studentYearValue = student.year || "";
+
+        // Add a department header row whenever the department changes
+        if (currentDeptCategory !== studentDeptCategory) {
+            currentDeptCategory = studentDeptCategory;
+            currentDegreeKey = null; // force the degree header to re-print too
+
+            table.innerHTML += `
+            <tr class="dept-category-header-row">
+                <td colspan="5" style="background: #6a11cb; color: white; font-weight: bold; padding: 14px 12px; text-align: left; font-size: 15px;">
+                    🏛️ ${studentDeptCategory}
+                </td>
+            </tr>
+            `;
+        }
+
+        // Add a degree header row whenever the degree changes (comparing
+        // normalized keys, so "B.Sc.cs.Ai" and "Bsc.cs.Ai" stay together)
+        if (currentDegreeKey !== studentDegreeKey) {
+            currentDegreeKey = studentDegreeKey;
+            currentYearValue = null; // force the year header to re-print too
+
+            table.innerHTML += `
+            <tr class="dept-header-row">
+                <td colspan="5" style="background: #2575fc; color: white; font-weight: bold; padding: 12px; text-align: left; font-size: 14px;">
+                    📚 ${student.dept || "Unknown Degree"}
+                </td>
+            </tr>
+            `;
+        }
+
+        // Add a year subheader whenever the year changes, so 1st year and
+        // 2nd year (etc.) students under the same degree appear as
+        // separate blocks instead of being mixed together.
+        if (currentYearValue !== studentYearValue) {
+            currentYearValue = studentYearValue;
+            maleHeader = false;
+            femaleHeader = false;
+
+            table.innerHTML += `
+            <tr class="year-header-row">
+                <td colspan="5" style="background: #00b894; color: white; font-weight: bold; padding: 10px 12px; text-align: left; font-size: 13px;">
+                    🎓 ${studentYearValue ? `Year ${studentYearValue}` : "Year Not Set"}
+                </td>
+            </tr>
+            `;
+        }
+
+        // Add gender subheader if gender changed
+        if (student.gender === "Male" && !maleHeader) {
+            maleHeader = true;
+            table.innerHTML += `
+            <tr class="gender-header-row">
+                <td colspan="5" style="background: #e8f0ff; color: #2575fc; font-weight: bold; padding: 8px 12px; text-align: left; font-size: 12px;">
+                    👦 Boys
+                </td>
+            </tr>
+            `;
+        } else if (student.gender === "Female" && !femaleHeader && maleHeader) {
+            femaleHeader = true;
+            table.innerHTML += `
+            <tr class="gender-header-row">
+                <td colspan="5" style="background: #ffe8f0; color: #e74c3c; font-weight: bold; padding: 8px 12px; text-align: left; font-size: 12px;">
+                    👧 Girls
+                </td>
+            </tr>
+            `;
         }
 
         table.innerHTML += `
@@ -599,7 +843,7 @@ function renderStudents(list = students) {
 
     const uniqueDepts = new Set(
         sortedList
-            .map((s) => (s.dept || "").trim())
+            .map((s) => normalizeDeptKey(s.dept))
             .filter((d) => d !== "")
     );
     deptCount.innerText = uniqueDepts.size;
@@ -641,6 +885,9 @@ function editStudent(id){
     yearInput.value = student.year || "";
     regnoInput.value = student.regno || "";
     mobileInput.value = student.mobile;
+    emailInput.value = student.email || "";
+    parentMobileInput.value = student.parentMobile || "";
+    addressInput.value = student.address || "";
     genderInput.value = student.gender;
 
     editId = id;
@@ -661,6 +908,15 @@ function deleteStudent(id){
 }
 
 
+const yearFilterSelect = document.getElementById("yearFilter");
+
+if (yearFilterSelect) {
+    yearFilterSelect.addEventListener("change", () => {
+        selectedYear = yearFilterSelect.value;
+        applyFilters();
+    });
+}
+
 const searchSuggestions = document.getElementById("searchSuggestions");
 
 search.addEventListener("keyup", () => {
@@ -668,15 +924,8 @@ search.addEventListener("keyup", () => {
     const rawValue = search.value.trim();
     const value = rawValue.toLowerCase();
 
-    const filtered = students.filter(student =>
-
-        student.name.toLowerCase().includes(value) ||
-        student.dept.toLowerCase().includes(value)
-
-    );
-
-    renderStudents(filtered);
-    updateBreadcrumb(rawValue ? `Search: "${rawValue}"` : null);
+    currentFilter = rawValue ? { type: "search", value: rawValue } : { type: "all", value: "" };
+    applyFilters();
 
     if (value === "") {
         searchSuggestions.innerHTML = "";
@@ -725,6 +974,9 @@ function showStudentInfo(id) {
         <p><b>Reg. No.:</b> ${student.regno || "Not added"}</p>
         <p><b>Mobile No.:</b> <a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></p>
         <p><b>Gender:</b> ${student.gender}</p>
+        <p><b>Email:</b> ${student.email ? `<a href="mailto:${student.email}" class="call-link">${student.email}</a>` : "Not added"}</p>
+        <p><b>Parent's Mobile No.:</b> ${student.parentMobile ? `<a href="tel:${student.parentMobile}" class="call-link">${student.parentMobile}</a>` : "Not added"}</p>
+        <p><b>Address:</b> ${student.address || "Not added"}</p>
     `;
 
     popup.classList.add("active");
@@ -749,24 +1001,19 @@ function showStatPopup(type) {
 
         title.textContent = "Degrees";
 
-        const deptMap = {};
-        students.forEach((s) => {
-            const d = (s.dept || "").trim();
-            if (d === "") return;
-            deptMap[d] = (deptMap[d] || 0) + 1;
-        });
+        const deptGroups = groupByNormalizedDept(students.filter((s) => (s.dept || "").trim() !== ""));
 
-        const deptNames = Object.keys(deptMap).sort((a, b) =>
-            a.localeCompare(b, undefined, { sensitivity: "base" })
+        const sortedGroups = [...deptGroups.values()].sort((a, b) =>
+            compareByDeptDegree(a.label, b.label)
         );
 
-        content.innerHTML = deptNames.length === 0
+        content.innerHTML = sortedGroups.length === 0
             ? `<p class="stat-list-empty">No degrees yet.</p>`
-            : deptNames.map((d) => `
-                <div class="stat-list-item" onclick="filterByDept('${d.replace(/'/g, "\\'")}')">
+            : sortedGroups.map((g) => `
+                <div class="stat-list-item" onclick="filterByDept('${g.label.replace(/'/g, "\\'")}')">
                     <i class="fa-solid fa-building"></i>
-                    <span>${d}</span>
-                    <b>${deptMap[d]} student${deptMap[d] === 1 ? "" : "s"}</b>
+                    <span>${g.label}</span>
+                    <b>${g.items.length} student${g.items.length === 1 ? "" : "s"}</b>
                 </div>
             `).join("");
 
@@ -783,9 +1030,14 @@ function showStatPopup(type) {
             title.textContent = "Girls";
         }
 
-        const sorted = [...list].sort((a, b) =>
-            a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
-        );
+        // Sort by department (dropdown order), then degree, then name
+        const sorted = [...list].sort((a, b) => {
+            const degreeCompare = compareByDeptDegree(a.dept, b.dept);
+            if (degreeCompare !== 0) {
+                return degreeCompare;
+            }
+            return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        });
 
         content.innerHTML = sorted.length === 0
             ? `<p class="stat-list-empty">No students yet.</p>`
@@ -811,9 +1063,8 @@ function openStudentFromStatList(id) {
 function filterByDept(dept) {
     document.getElementById("statListPopup").classList.remove("active");
     search.value = dept;
-    const filtered = students.filter((student) => student.dept === dept);
-    renderStudents(filtered);
-    updateBreadcrumb(dept);
+    currentFilter = { type: "dept", value: dept };
+    applyFilters();
 }
 
 document.getElementById("closeStatList").onclick = function () {
@@ -829,8 +1080,10 @@ function updateBreadcrumb(label) {
 function resetBreadcrumb() {
     search.value = "";
     searchSuggestions.classList.remove("active");
-    renderStudents();
-    updateBreadcrumb(null);
+    selectedYear = "";
+    if (yearFilterSelect) yearFilterSelect.value = "";
+    currentFilter = { type: "all", value: "" };
+    applyFilters();
 }
 
 
@@ -1008,6 +1261,7 @@ const importFileInput = document.getElementById("importFileInput");
 
 const exportPopup = document.getElementById("exportPopup");
 const exportDeptSelect = document.getElementById("exportDept");
+const exportYearSelect = document.getElementById("exportYear");
 const exportSummary = document.getElementById("exportSummary");
 const exportCancelBtn = document.getElementById("exportCancelBtn");
 const exportShareBtn = document.getElementById("exportShareBtn");
@@ -1039,16 +1293,31 @@ function base64DecodeUnicode(b64) {
 
 /* ---------- export ---------- */
 
+// Sorts students by department (dropdown order), then degree, then
+// gender (boys first), then name.
+function sortStudentsByDeptAndGender(studentList) {
+    return [...studentList].sort(compareByDeptDegreeGenderName);
+}
+
 function getExportDeptOptions() {
-    const depts = new Set(
-        students.map((s) => (s.dept || "").trim()).filter((d) => d !== "")
-    );
-    return [...depts].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    const groups = groupByNormalizedDept(students.filter((s) => (s.dept || "").trim() !== ""));
+    return [...groups.values()]
+        .map((g) => g.label)
+        .sort(compareByDeptDegree);
 }
 
 function getFilteredExportList() {
     const dept = exportDeptSelect.value;
-    return dept ? students.filter((s) => s.dept === dept) : students;
+    const key = normalizeDeptKey(dept);
+    let filtered = dept ? students.filter((s) => normalizeDeptKey(s.dept) === key) : students;
+
+    const year = exportYearSelect ? exportYearSelect.value : "";
+    if (year) {
+        filtered = filtered.filter((s) => (s.year || "") === year);
+    }
+
+    // Apply sorting by department, gender, and name
+    return sortStudentsByDeptAndGender(filtered);
 }
 
 function updateExportSummary() {
@@ -1065,6 +1334,8 @@ if (exportBtn) {
                 .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
                 .join("");
 
+        if (exportYearSelect) exportYearSelect.value = "";
+
         updateExportSummary();
         exportPopup.classList.add("active");
     };
@@ -1072,6 +1343,10 @@ if (exportBtn) {
 
 if (exportDeptSelect) {
     exportDeptSelect.addEventListener("change", updateExportSummary);
+}
+
+if (exportYearSelect) {
+    exportYearSelect.addEventListener("change", updateExportSummary);
 }
 
 if (exportCancelBtn) {
@@ -1091,6 +1366,9 @@ function embedStudentData(doc, list) {
             year: s.year || "",
             regno: s.regno || "",
             mobile: s.mobile,
+            email: s.email || "",
+            parentMobile: s.parentMobile || "",
+            address: s.address || "",
             gender: s.gender
         }))
     };
@@ -1121,38 +1399,157 @@ function embedStudentData(doc, list) {
     });
 }
 
-function generateStudentsPDF(list, deptLabel) {
+// Splits an already department/degree-sorted list into year blocks (I,
+// II, III, then unset), preserving encounter order. Used so the PDF
+// mirrors the on-screen table, where 1st year and 2nd year students under
+// the same degree are shown as separate sections instead of one mixed list.
+function groupByYear(items) {
+    const order = [];
+    const map = new Map();
+
+    items.forEach((s) => {
+        const y = s.year || "";
+        if (!map.has(y)) {
+            map.set(y, []);
+            order.push(y);
+        }
+        map.get(y).push(s);
+    });
+
+    return order.map((y) => ({ year: y, items: map.get(y) }));
+}
+
+function yearSectionLabel(year) {
+    return year ? `Year ${year}` : "Year Not Set";
+}
+
+// Draws one degree's students as a sequence of small "Year X" titles, each
+// followed by its own table — instead of one table mixing every year
+// together. Adds a page break first if there isn't room for a new section.
+function drawYearSections(doc, items, startY) {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = startY;
+
+    groupByYear(items).forEach((yearGroup) => {
+        if (y > pageHeight - 40) {
+            doc.addPage();
+            y = 14;
+        }
+
+        doc.setFontSize(10);
+        doc.setTextColor(0, 150, 100);
+        doc.setFont("helvetica", "bold");
+        doc.text(yearSectionLabel(yearGroup.year), 14, y);
+
+        y += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(0);
+
+        const rows = yearGroup.items.map((s) => [
+            s.name,
+            s.dept,
+            s.year || "-",
+            s.regno || "-",
+            s.mobile,
+            s.gender
+        ]);
+
+        doc.autoTable({
+            startY: y,
+            head: [["Name", "Degree", "Year", "Reg. No.", "Mobile", "Gender"]],
+            body: rows,
+            styles: { fontSize: 9 },
+            headStyles: { fillColor: [37, 117, 252] },
+            alternateRowStyles: { fillColor: [245, 247, 255] },
+            didDrawPage: function (data) {
+                y = data.cursor.y + 10;
+            }
+        });
+
+        y = doc.lastAutoTable.finalY + 12;
+    });
+
+    return y;
+}
+
+function generateStudentsPDF(list, deptLabel, yearLabel) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
+    // Sort students: Department → Degree → Year → Gender (Boys first) → Name
+    const sortedList = sortStudentsByDeptAndGender(list);
+
+    // Header
     doc.setFontSize(18);
     doc.setTextColor(30, 30, 30);
     doc.text("Student Management System", 14, 18);
 
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.text(`${deptLabel} — ${list.length} student${list.length === 1 ? "" : "s"}`, 14, 26);
-    doc.text(`Exported on ${new Date().toLocaleDateString()}`, 14, 32);
 
-    doc.autoTable({
-        startY: 38,
-        head: [["Name", "Degree", "Year", "Reg. No.", "Mobile", "Gender"]],
-        body: [...list]
-            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
-            .map((s) => [s.name, s.dept, s.year || "-", s.regno || "-", s.mobile, s.gender]),
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [37, 117, 252] },
-        alternateRowStyles: { fillColor: [245, 247, 255] }
-    });
+    // Check if single department or all
+    const isSingleDept = exportDeptSelect.value && exportDeptSelect.value !== "";
+    const yearSuffix = yearLabel ? ` — ${yearLabel}` : "";
+
+    if (isSingleDept) {
+        // Single department export
+        doc.text(`${deptLabel}${yearSuffix} — ${list.length} student${list.length === 1 ? "" : "s"}`, 14, 26);
+        doc.text(`Exported on ${new Date().toLocaleDateString()}`, 14, 32);
+
+        // Broken into year sections so year I and year II (etc.) don't mix
+        drawYearSections(doc, sortedList, 40);
+    } else {
+        // All departments export - show each department separately
+        doc.text(`All Departments${yearSuffix} — ${sortedList.length} student${sortedList.length === 1 ? "" : "s"}`, 14, 26);
+        doc.text(`Exported on ${new Date().toLocaleDateString()}`, 14, 32);
+
+        // Group by department (already sorted department-first, degree
+        // second by sortStudentsByDeptAndGender above), merging variant
+        // spellings of the same degree into one section
+        const deptGroupMap = groupByNormalizedDept(sortedList);
+
+        // Map preserves insertion order, so these labels are already in
+        // department-dropdown order, then degree order — no re-sort needed
+        const deptNames = [...deptGroupMap.values()].map((g) => g.label);
+
+        const deptGroups = {};
+        deptGroupMap.forEach((g) => {
+            deptGroups[g.label] = g.items;
+        });
+
+        let currentYPosition = 38;
+
+        // Add each department as a section
+        deptNames.forEach((deptName, index) => {
+            // Add new page if needed (but not for first department)
+            if (index > 0) {
+                doc.addPage();
+                currentYPosition = 14;
+            }
+
+            // Department title
+            doc.setFontSize(13);
+            doc.setTextColor(37, 117, 252);
+            doc.setFont("helvetica", "bold");
+            doc.text(`${deptName}`, 14, currentYPosition);
+
+            currentYPosition += 10;
+
+            // Students for this department, broken into year sections
+            // (already sorted: year, then boys before girls, alphabetically)
+            currentYPosition = drawYearSections(doc, deptGroups[deptName], currentYPosition);
+        });
+    }
 
     embedStudentData(doc, list);
-
     return doc;
 }
 
-function exportFileName(deptLabel) {
-    const safe = deptLabel.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
-    return `students_${safe || "all"}.pdf`;
+function exportFileName(deptLabel, yearLabel) {
+    const safeDept = deptLabel.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+    const safeYear = yearLabel ? `_${yearLabel.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "")}` : "";
+    return `students_${safeDept || "all"}${safeYear}.pdf`;
 }
 
 if (exportDownloadBtn) {
@@ -1163,8 +1560,9 @@ if (exportDownloadBtn) {
             return;
         }
         const deptLabel = exportDeptSelect.value || "All Degrees";
-        const doc = generateStudentsPDF(list, deptLabel);
-        doc.save(exportFileName(deptLabel));
+        const yearLabel = exportYearSelect && exportYearSelect.value ? `Year ${exportYearSelect.value}` : "";
+        const doc = generateStudentsPDF(list, deptLabel, yearLabel);
+        doc.save(exportFileName(deptLabel, yearLabel));
         exportPopup.classList.remove("active");
     };
 }
@@ -1177,8 +1575,9 @@ if (exportShareBtn) {
             return;
         }
         const deptLabel = exportDeptSelect.value || "All Degrees";
-        const doc = generateStudentsPDF(list, deptLabel);
-        const fileName = exportFileName(deptLabel);
+        const yearLabel = exportYearSelect && exportYearSelect.value ? `Year ${exportYearSelect.value}` : "";
+        const doc = generateStudentsPDF(list, deptLabel, yearLabel);
+        const fileName = exportFileName(deptLabel, yearLabel);
         const blob = doc.output("blob");
         const file = new File([blob], fileName, { type: "application/pdf" });
 
@@ -1187,7 +1586,7 @@ if (exportShareBtn) {
                 await navigator.share({
                     files: [file],
                     title: "Student List",
-                    text: `${deptLabel} — ${list.length} student${list.length === 1 ? "" : "s"}`
+                    text: `${deptLabel}${yearLabel ? " — " + yearLabel : ""} — ${list.length} student${list.length === 1 ? "" : "s"}`
                 });
             } catch (err) {
                 if (err.name !== "AbortError") {
@@ -1279,6 +1678,9 @@ async function importStudentsFromList(importedStudents) {
             year: (raw.year || "").trim(),
             regno: (raw.regno || "").trim(),
             mobile: (raw.mobile || "").trim(),
+            email: (raw.email || "").trim(),
+            parentMobile: (raw.parentMobile || "").trim(),
+            address: (raw.address || "").trim(),
             gender: raw.gender === "Female" ? "Female" : "Male"
         };
 
