@@ -1151,10 +1151,12 @@ body{
     box-shadow:0 20px 60px rgba(0,0,0,.3),
                inset 0 1px 0 rgba(255,255,255,.2);
     animation:welcomeSlideUp .8s cubic-bezier(.34,.1,.68,1) forwards;
+    overflow-wrap:break-word;
+    word-break:break-word;
 }
 
 .welcome-box h1{
-    font-size:64px;
+    font-size:clamp(34px, 10vw, 64px);
     margin-bottom:20px;
     font-weight:700;
     animation:welcomeFadeInScale .8s cubic-bezier(.34,.1,.68,1) .2s backwards;
@@ -1162,7 +1164,7 @@ body{
 }
 
 .welcome-box h2{
-    font-size:32px;
+    font-size:clamp(18px, 5.5vw, 32px);
     color:#ffd60a;
     margin-bottom:20px;
     font-weight:600;
@@ -1171,12 +1173,18 @@ body{
 }
 
 .welcome-box p{
-    font-size:17px;
+    font-size:clamp(14px, 3.6vw, 17px);
     line-height:1.6;
     opacity:.95;
     margin:12px 0;
     font-weight:500;
     animation:welcomeFadeIn .8s cubic-bezier(.34,.1,.68,1) .5s backwards;
+}
+
+@media(max-width:400px){
+    .welcome-box{
+        padding:40px 24px;
+    }
 }
 
 .welcome-box p:first-of-type{
