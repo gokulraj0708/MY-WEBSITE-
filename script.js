@@ -350,7 +350,7 @@ forgotPasswordLink.onclick = (e) => {
 
     auth.sendPasswordResetEmail(email)
         .then(() => {
-            authInfo.textContent = `Password reset link sent to ${email}. Check your inbox.`;
+            authInfo.textContent = `Password reset link sent to ${email}. Check your inbox. If you don't see it, please check your Gmail spam/junk folder.`;
         })
         .catch((err) => {
             authError.textContent = err.code === "auth/user-not-found"
@@ -381,7 +381,7 @@ resetPasswordBtn.onclick = () => {
 
     auth.sendPasswordResetEmail(currentUser.email)
         .then(() => {
-            alert(`Password reset link sent to ${currentUser.email}.`);
+            alert(`Password reset link sent to ${currentUser.email}. If you don't get the mail, please check your Gmail spam/junk folder.`);
         })
         .catch((err) => {
             alert(getFriendlyAuthError(err.code));
