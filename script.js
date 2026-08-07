@@ -340,29 +340,76 @@ function getFriendlyAuthError(code) {
 const forgotPasswordLink = document.getElementById("forgotPasswordLink");
 const authInfo = document.getElementById("authInfo");
 
-forgotPasswordLink.onclick = (e) => {
-    e.preventDefault();
+const forgotPasswordPopup = document.getElementById("forgotPasswordPopup");
+const forgotPasswordEmail = document.getElementById("forgotPasswordEmail");
+const forgotPasswordError = document.getElementById("forgotPasswordError");
+const forgotPasswordCancelBtn = document.getElementById("forgotPasswordCancelBtn");
+const forgotPasswordSendBtn = document.getElementById("forgotPasswordSendBtn");
+const closeForgotPassword = document.getElementById("closeForgotPassword");
+
+const resetSentPopup = document.getElementById("resetSentPopup");
+const resetSentEmail = document.getElementById("resetSentEmail");
+const resetSentOkBtn = document.getElementById("resetSentOkBtn");
+const closeResetSent = document.getElementById("closeResetSent");
+
+function openForgotPasswordPopup(){
     authError.textContent = "";
     authInfo.textContent = "";
+    forgotPasswordError.textContent = "";
+    forgotPasswordEmail.value = authEmail.value.trim();
+    forgotPasswordPopup.classList.add("active");
+    forgotPasswordEmail.focus();
+}
 
-    const email = authEmail.value.trim();
+function closeForgotPasswordPopup(){
+    forgotPasswordPopup.classList.remove("active");
+    forgotPasswordError.textContent = "";
+}
+
+forgotPasswordLink.onclick = (e) => {
+    e.preventDefault();
+    openForgotPasswordPopup();
+};
+
+forgotPasswordCancelBtn.onclick = closeForgotPasswordPopup;
+closeForgotPassword.onclick = closeForgotPasswordPopup;
+
+forgotPasswordSendBtn.onclick = () => {
+    const email = forgotPasswordEmail.value.trim();
+    forgotPasswordError.textContent = "";
 
     if (!email) {
-        authError.textContent = "Enter your email above first, then tap 'Forgot password?'.";
-        authEmail.focus();
+        forgotPasswordError.textContent = "Please enter your email address.";
+        forgotPasswordEmail.focus();
         return;
     }
 
+    forgotPasswordSendBtn.disabled = true;
+    forgotPasswordSendBtn.textContent = "Sending...";
+
     auth.sendPasswordResetEmail(email)
         .then(() => {
-            authInfo.textContent = `Password reset link sent to ${email}. Check your inbox. If you don't see it, please check your Gmail spam/junk folder.`;
+            closeForgotPasswordPopup();
+            resetSentEmail.textContent = email;
+            resetSentPopup.classList.add("active");
         })
         .catch((err) => {
-            authError.textContent = err.code === "auth/user-not-found"
+            forgotPasswordError.textContent = err.code === "auth/user-not-found"
                 ? "No account found with that email."
                 : getFriendlyAuthError(err.code);
+        })
+        .finally(() => {
+            forgotPasswordSendBtn.disabled = false;
+            forgotPasswordSendBtn.textContent = "Send Reset Link";
         });
 };
+
+function closeResetSentPopup(){
+    resetSentPopup.classList.remove("active");
+}
+
+resetSentOkBtn.onclick = closeResetSentPopup;
+closeResetSent.onclick = closeResetSentPopup;
 
 const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 

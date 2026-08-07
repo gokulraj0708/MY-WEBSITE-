@@ -71,6 +71,36 @@
             <a href="#" id="authSwitchLink">Sign up</a>
         </p>
     </div>
+
+    <!-- Forgot Password Popup -->
+    <div id="forgotPasswordPopup" class="profile-popup">
+        <div class="profile-box forgot-password-box">
+            <span id="closeForgotPassword" class="popup-close">&times;</span>
+            <div class="forgot-icon"><i class="fa-solid fa-key"></i></div>
+            <h2>Reset your password</h2>
+            <p class="forgot-password-desc">Enter your email and we'll send you a link to reset your password.</p>
+
+            <input type="email" id="forgotPasswordEmail" placeholder="Email">
+            <p id="forgotPasswordError" class="auth-error"></p>
+
+            <div class="buttons forgot-password-buttons">
+                <button id="forgotPasswordCancelBtn" type="button">Cancel</button>
+                <button id="forgotPasswordSendBtn" type="button">Send Reset Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Link Sent Popup -->
+    <div id="resetSentPopup" class="profile-popup">
+        <div class="profile-box reset-sent-box">
+            <span id="closeResetSent" class="popup-close">&times;</span>
+            <div class="reset-sent-icon"><i class="fa-solid fa-paper-plane"></i></div>
+            <h2>Check your email!</h2>
+            <p>We've sent a password reset link to<br><strong id="resetSentEmail"></strong></p>
+            <p class="reset-sent-hint"><i class="fa-solid fa-circle-info"></i> Didn't get it? Check your spam or junk folder.</p>
+            <button id="resetSentOkBtn" type="button" class="reset-sent-ok-btn">Got it</button>
+        </div>
+    </div>
 </div>
 
 <div id="welcomeScreen">

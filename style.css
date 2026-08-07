@@ -1703,6 +1703,178 @@ header{
     text-decoration:underline;
 }
 
+/* Forgot Password Popup */
+
+.popup-close{
+    float:right;
+    font-size:26px;
+    line-height:1;
+    cursor:pointer;
+    color:#999;
+    transition:.2s;
+}
+
+.popup-close:hover{
+    color:#e74c3c;
+}
+
+.forgot-password-box,
+.reset-sent-box{
+    width:340px;
+    text-align:center;
+}
+
+.forgot-icon,
+.reset-sent-icon{
+    width:62px;
+    height:62px;
+    line-height:62px;
+    border-radius:50%;
+    margin:6px auto 16px;
+    font-size:26px;
+    color:#fff;
+    clear:both;
+}
+
+.forgot-icon{
+    background:linear-gradient(135deg,#2575fc,#6a11cb);
+    box-shadow:0 8px 20px rgba(37,117,252,.35);
+}
+
+.reset-sent-icon{
+    background:linear-gradient(135deg,#00b894,#00c6ff);
+    box-shadow:0 8px 20px rgba(0,184,148,.35);
+}
+
+.forgot-password-box h2,
+.reset-sent-box h2{
+    font-size:19px;
+    margin-bottom:8px;
+}
+
+.forgot-password-desc{
+    font-size:13.5px;
+    color:#666;
+    margin-bottom:16px;
+}
+
+body.dark .forgot-password-desc{
+    color:#a3adc2;
+}
+
+.forgot-password-box input{
+    width:100%;
+    padding:12px 14px;
+    margin-bottom:6px;
+    border:1px solid #ddd;
+    border-radius:10px;
+    font-size:14px;
+    outline:none;
+    transition:.2s;
+}
+
+.forgot-password-box input:focus{
+    border-color:#2575fc;
+}
+
+body.dark .forgot-password-box input{
+    background:#0f172a;
+    border-color:#334155;
+    color:#fff;
+}
+
+.forgot-password-buttons{
+    display:flex;
+    gap:12px;
+    margin-top:14px;
+}
+
+.forgot-password-buttons button{
+    flex:1;
+    padding:11px;
+    border-radius:10px;
+    border:none;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+#forgotPasswordCancelBtn{
+    background:#f1f1f1;
+    color:#444;
+}
+
+#forgotPasswordCancelBtn:hover{
+    background:#e2e2e2;
+}
+
+body.dark #forgotPasswordCancelBtn{
+    background:#1e293b;
+    color:#cbd5e1;
+}
+
+body.dark #forgotPasswordCancelBtn:hover{
+    background:#334155;
+}
+
+#forgotPasswordSendBtn{
+    background:linear-gradient(135deg,#2575fc,#6a11cb);
+    color:#fff;
+}
+
+#forgotPasswordSendBtn:hover{
+    opacity:.9;
+}
+
+#forgotPasswordSendBtn:disabled{
+    opacity:.6;
+    cursor:not-allowed;
+}
+
+.reset-sent-box p{
+    font-size:14px;
+    color:#555;
+    margin-bottom:10px;
+    line-height:1.5;
+}
+
+body.dark .reset-sent-box p{
+    color:#cbd5e1;
+}
+
+.reset-sent-box strong{
+    color:#2575fc;
+    word-break:break-all;
+}
+
+.reset-sent-hint{
+    font-size:12.5px !important;
+    color:#888 !important;
+    margin-bottom:20px !important;
+}
+
+body.dark .reset-sent-hint{
+    color:#94a3b8 !important;
+}
+
+.reset-sent-ok-btn{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:linear-gradient(135deg,#00b894,#00c6ff);
+    color:#fff;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.reset-sent-ok-btn:hover{
+    opacity:.9;
+}
+
 .auth-switch{
     margin-top:16px !important;
     font-size:13px;
