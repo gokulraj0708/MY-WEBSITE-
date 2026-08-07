@@ -708,6 +708,7 @@ function renderSkeleton(rows = 4) {
         <tr class="skeleton-row">
             <td><div class="skeleton-bar" style="width:70%"></div></td>
             <td><div class="skeleton-bar" style="width:60%"></div></td>
+            <td><div class="skeleton-bar" style="width:30%;margin:0 auto"></div></td>
             <td><div class="skeleton-bar" style="width:55%"></div></td>
             <td><div class="skeleton-bar" style="width:40%;margin:0 auto"></div></td>
             <td><div class="skeleton-bar skeleton-bar-actions"></div></td>
@@ -729,7 +730,7 @@ function renderLoadError(err) {
 
     table.innerHTML = `
         <tr>
-            <td colspan="5" class="table-error">
+            <td colspan="6" class="table-error">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 ${message}
             </td>
@@ -785,7 +786,7 @@ function renderStudents(list = students) {
 
             table.innerHTML += `
             <tr class="dept-category-header-row">
-                <td colspan="5" style="background: #6a11cb; color: white; font-weight: bold; padding: 14px 12px; text-align: left; font-size: 15px;">
+                <td colspan="6" style="background: #6a11cb; color: white; font-weight: bold; padding: 14px 12px; text-align: left; font-size: 15px;">
                     🏛️ ${studentDeptCategory}
                 </td>
             </tr>
@@ -800,7 +801,7 @@ function renderStudents(list = students) {
 
             table.innerHTML += `
             <tr class="dept-header-row">
-                <td colspan="5" style="background: #2575fc; color: white; font-weight: bold; padding: 12px; text-align: left; font-size: 14px;">
+                <td colspan="6" style="background: #2575fc; color: white; font-weight: bold; padding: 12px; text-align: left; font-size: 14px;">
                     📚 ${student.dept || "Unknown Degree"}
                 </td>
             </tr>
@@ -817,7 +818,7 @@ function renderStudents(list = students) {
 
             table.innerHTML += `
             <tr class="year-header-row">
-                <td colspan="5" style="background: #00b894; color: white; font-weight: bold; padding: 10px 12px; text-align: left; font-size: 13px;">
+                <td colspan="6" style="background: #00b894; color: white; font-weight: bold; padding: 10px 12px; text-align: left; font-size: 13px;">
                     🎓 ${studentYearValue ? `Year ${studentYearValue}` : "Year Not Set"}
                 </td>
             </tr>
@@ -829,7 +830,7 @@ function renderStudents(list = students) {
             maleHeader = true;
             table.innerHTML += `
             <tr class="gender-header-row">
-                <td colspan="5" style="background: #e8f0ff; color: #2575fc; font-weight: bold; padding: 8px 12px; text-align: left; font-size: 12px;">
+                <td colspan="6" style="background: #e8f0ff; color: #2575fc; font-weight: bold; padding: 8px 12px; text-align: left; font-size: 12px;">
                     👦 Boys
                 </td>
             </tr>
@@ -838,7 +839,7 @@ function renderStudents(list = students) {
             femaleHeader = true;
             table.innerHTML += `
             <tr class="gender-header-row">
-                <td colspan="5" style="background: #ffe8f0; color: #e74c3c; font-weight: bold; padding: 8px 12px; text-align: left; font-size: 12px;">
+                <td colspan="6" style="background: #ffe8f0; color: #e74c3c; font-weight: bold; padding: 8px 12px; text-align: left; font-size: 12px;">
                     👧 Girls
                 </td>
             </tr>
@@ -849,6 +850,7 @@ function renderStudents(list = students) {
         <tr class="fade-row">
             <td><a href="#" class="name-link" onclick="showStudentInfo('${student.id}'); return false;">${student.name}</a></td>
             <td>${student.dept}</td>
+            <td>${student.year || "-"}</td>
             <td><a href="tel:${student.mobile}" class="call-link">${student.mobile}</a></td>
             <td>${student.gender}</td>
 

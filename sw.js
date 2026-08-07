@@ -10,8 +10,8 @@ const SHELL_FILES = [
   './style.css',
   './script.js',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  './icon1.jpg',
+  './icon2.jpg'
 ];
 
 self.addEventListener('install', (event) => {
