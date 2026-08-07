@@ -131,7 +131,7 @@
 
                 <div class="team-feedback">
                     <p>Any suggestions or report bug</p>
-                    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=bharishraghavendar25904bscai@gmail.com&su=Student%20Management%20System%20-%20Feedback" target="_blank" rel="noopener" id="feedbackEmailLink">bharishraghavendar25904bscai@gmail.com</a>
+                    <a href="mailto:bharishraghavendar25904bscai@gmail.com?subject=Student%20Management%20System%20-%20Feedback" id="feedbackEmailLink">bharishraghavendar25904bscai@gmail.com</a>
                 </div>
             </div>
         </div>
@@ -220,13 +220,29 @@ Add Student
 </div>
 
 <div class="year-filter-bar">
-<label for="yearFilter"><i class="fa-solid fa-calendar-days"></i> Filter by Year</label>
-<select id="yearFilter">
+<div class="filter-group">
+<label for="filterDepartment"><i class="fa-solid fa-building"></i> Department</label>
+<select id="filterDepartment">
+<option value="">All Departments</option>
+</select>
+</div>
+
+<div class="filter-group">
+<label for="filterDegree"><i class="fa-solid fa-graduation-cap"></i> Degree</label>
+<select id="filterDegree">
+<option value="">All Degrees</option>
+</select>
+</div>
+
+<div class="filter-group">
+<label for="filterYear"><i class="fa-solid fa-calendar-days"></i> Year</label>
+<select id="filterYear">
 <option value="">All Years</option>
 <option value="I">I Year</option>
 <option value="II">II Year</option>
 <option value="III">III Year</option>
 </select>
+</div>
 </div>
 
 <div class="table-wrapper">
@@ -287,7 +303,7 @@ Add Student
 
 <input type="email" id="email" placeholder="Email (optional)">
 
-<input type="tel" id="parentMobile" placeholder="Parent's Mobile No. (optional)" maxlength="10">
+<input type="tel" id="parentMobile" placeholder="Parent's Mobile No." maxlength="10">
 
 <input type="text" id="address" placeholder="Address (optional)">
 
@@ -308,6 +324,10 @@ Add Student
 <div class="popup" id="exportPopup">
 <div class="popup-content">
 <h2><i class="fa-solid fa-file-export"></i> Export Students</h2>
+
+<select id="exportDepartment">
+<option value="">All Departments</option>
+</select>
 
 <select id="exportDept">
 <option value="">All Degrees</option>

@@ -188,7 +188,10 @@ let unsubscribeStudents = null; // Firestore real-time listener
 
 // Current table filter state. `currentFilter` tracks the search/degree
 // filter (from the search box or a dashboard drill-down), while
-// `selectedYear` is the independent Year filter — the two combine.
+// `selectedDepartment`, `selectedDegree`, and `selectedYear` are the
+// independent Department → Degree → Year dropdown filters — they all combine.
+let selectedDepartment = "";
+let selectedDegree = "";
 let selectedYear = "";
 let currentFilter = { type: "all", value: "" }; // type: "all" | "search" | "dept"
 
@@ -204,6 +207,15 @@ function computeFilteredList() {
     } else if (currentFilter.type === "dept") {
         const key = normalizeDeptKey(currentFilter.value);
         list = list.filter(student => normalizeDeptKey(student.dept) === key);
+    }
+
+    if (selectedDepartment) {
+        list = list.filter(student => departmentForStudent(student.dept) === selectedDepartment);
+    }
+
+    if (selectedDegree) {
+        const degreeKey = normalizeDeptKey(selectedDegree);
+        list = list.filter(student => normalizeDeptKey(student.dept) === degreeKey);
     }
 
     if (selectedYear) {
@@ -222,9 +234,14 @@ function buildBreadcrumbLabel() {
         label = currentFilter.value;
     }
 
-    if (selectedYear) {
-        const yearText = `Year ${selectedYear}`;
-        label = label ? `${label} • ${yearText}` : yearText;
+    const extras = [];
+    if (selectedDepartment) extras.push(selectedDepartment);
+    if (selectedDegree) extras.push(selectedDegree);
+    if (selectedYear) extras.push(`Year ${selectedYear}`);
+
+    if (extras.length) {
+        const extraText = extras.join(" • ");
+        label = label ? `${label} • ${extraText}` : extraText;
     }
 
     return label;
@@ -439,6 +456,7 @@ auth.onAuthStateChanged((user) => {
                 .collection("list")
                 .onSnapshot((snapshot) => {
                     students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+                    refreshTableFilterOptions();
                     applyFilters();
                 }, (err) => {
                     console.error("Sync error:", err);
@@ -450,9 +468,13 @@ auth.onAuthStateChanged((user) => {
         appContent.style.display = "none";
         authScreen.style.display = "flex";
         students = [];
+        selectedDepartment = "";
+        selectedDegree = "";
         selectedYear = "";
         currentFilter = { type: "all", value: "" };
-        if (yearFilterSelect) yearFilterSelect.value = "";
+        if (filterDepartmentSelect) filterDepartmentSelect.innerHTML = `<option value="">All Departments</option>`;
+        if (filterDegreeSelect) filterDegreeSelect.innerHTML = `<option value="">All Degrees</option>`;
+        if (filterYearSelect) filterYearSelect.value = "";
         if (search) search.value = "";
         renderStudents();
     }
@@ -579,7 +601,8 @@ saveBtn.onclick = () => {
         student.name === "" ||
         student.dept === "" ||
         student.year === "" ||
-        student.mobile === ""
+        student.mobile === "" ||
+        parentMobile === ""
     ) {
         alert("Please fill all fields.");
         return;
@@ -587,6 +610,15 @@ saveBtn.onclick = () => {
 
     if (!/^\d{10}$/.test(student.mobile)) {
         alert("Please enter a valid 10-digit mobile number.");
+        return;
+    }
+
+    const duplicateMobile = students.some(
+        (s) => s.id !== editId && (s.mobile || "").trim() === student.mobile
+    );
+
+    if (duplicateMobile) {
+        alert("This mobile number is already registered.");
         return;
     }
 
@@ -600,15 +632,14 @@ saveBtn.onclick = () => {
         return;
     }
 
-    if (parentMobile !== "") {
-        if (!/^\d{10}$/.test(parentMobile)) {
-            alert("Parent's mobile number must be a valid 10-digit number.");
-            return;
-        }
-        if (parentMobile === student.mobile) {
-            alert("Parent's mobile number must be different from the student's mobile number.");
-            return;
-        }
+    if (!/^\d{10}$/.test(parentMobile)) {
+        alert("Please enter a valid 10-digit parent's mobile number.");
+        return;
+    }
+
+    if (parentMobile === student.mobile) {
+        alert("Parent's mobile number must be different from the student's mobile number.");
+        return;
     }
 
     const savePromise = editId === null
@@ -908,11 +939,100 @@ function deleteStudent(id){
 }
 
 
-const yearFilterSelect = document.getElementById("yearFilter");
+const filterDepartmentSelect = document.getElementById("filterDepartment");
+const filterDegreeSelect = document.getElementById("filterDegree");
+const filterYearSelect = document.getElementById("filterYear");
 
-if (yearFilterSelect) {
-    yearFilterSelect.addEventListener("change", () => {
-        selectedYear = yearFilterSelect.value;
+// Departments (dropdown order, "Other" last) that currently have students —
+// shared logic for both the table filter bar and the export popup.
+function getPresentDepartmentOptions() {
+    const present = new Set(
+        students
+            .filter((s) => (s.dept || "").trim() !== "")
+            .map((s) => departmentForStudent(s.dept))
+    );
+
+    const ordered = departmentOrder.filter((d) => present.has(d));
+    if (present.has("Other")) ordered.push("Other");
+    return ordered;
+}
+
+// Degrees that currently have students, optionally narrowed to one
+// department category — shared by the table filter bar and export popup.
+function getPresentDegreeOptions(department) {
+    const groups = groupByNormalizedDept(students.filter((s) => (s.dept || "").trim() !== ""));
+    let labels = [...groups.values()].map((g) => g.label);
+
+    if (department) {
+        labels = labels.filter((label) => departmentForStudent(label) === department);
+    }
+
+    return labels.sort(compareByDeptDegree);
+}
+
+// Rebuilds the Degree dropdown for the current Department selection,
+// keeping the previous Degree selected if it's still a valid option.
+function refreshTableDegreeOptions() {
+    if (!filterDegreeSelect) return;
+
+    const degreeOptions = getPresentDegreeOptions(selectedDepartment);
+    const prevDegree = selectedDegree;
+
+    filterDegreeSelect.innerHTML = `<option value="">All Degrees</option>` +
+        degreeOptions
+            .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+            .join("");
+
+    if (degreeOptions.includes(prevDegree)) {
+        filterDegreeSelect.value = prevDegree;
+    } else {
+        selectedDegree = "";
+        filterDegreeSelect.value = "";
+    }
+}
+
+// Rebuilds both the Department and (cascading) Degree dropdowns to match
+// whatever data currently exists — called on login and on every realtime
+// data update, since new departments/degrees can appear or disappear.
+function refreshTableFilterOptions() {
+    if (!filterDepartmentSelect) return;
+
+    const deptOptions = getPresentDepartmentOptions();
+    const prevDept = selectedDepartment;
+
+    filterDepartmentSelect.innerHTML = `<option value="">All Departments</option>` +
+        deptOptions
+            .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+            .join("");
+
+    if (deptOptions.includes(prevDept)) {
+        filterDepartmentSelect.value = prevDept;
+    } else {
+        selectedDepartment = "";
+        filterDepartmentSelect.value = "";
+    }
+
+    refreshTableDegreeOptions();
+}
+
+if (filterDepartmentSelect) {
+    filterDepartmentSelect.addEventListener("change", () => {
+        selectedDepartment = filterDepartmentSelect.value;
+        refreshTableDegreeOptions();
+        applyFilters();
+    });
+}
+
+if (filterDegreeSelect) {
+    filterDegreeSelect.addEventListener("change", () => {
+        selectedDegree = filterDegreeSelect.value;
+        applyFilters();
+    });
+}
+
+if (filterYearSelect) {
+    filterYearSelect.addEventListener("change", () => {
+        selectedYear = filterYearSelect.value;
         applyFilters();
     });
 }
@@ -1080,8 +1200,12 @@ function updateBreadcrumb(label) {
 function resetBreadcrumb() {
     search.value = "";
     searchSuggestions.classList.remove("active");
+    selectedDepartment = "";
+    selectedDegree = "";
     selectedYear = "";
-    if (yearFilterSelect) yearFilterSelect.value = "";
+    if (filterDepartmentSelect) filterDepartmentSelect.value = "";
+    refreshTableDegreeOptions();
+    if (filterYearSelect) filterYearSelect.value = "";
     currentFilter = { type: "all", value: "" };
     applyFilters();
 }
@@ -1260,6 +1384,7 @@ const importBtn = document.getElementById("importBtn");
 const importFileInput = document.getElementById("importFileInput");
 
 const exportPopup = document.getElementById("exportPopup");
+const exportDepartmentSelect = document.getElementById("exportDepartment");
 const exportDeptSelect = document.getElementById("exportDept");
 const exportYearSelect = document.getElementById("exportYear");
 const exportSummary = document.getElementById("exportSummary");
@@ -1299,17 +1424,31 @@ function sortStudentsByDeptAndGender(studentList) {
     return [...studentList].sort(compareByDeptDegreeGenderName);
 }
 
-function getExportDeptOptions() {
-    const groups = groupByNormalizedDept(students.filter((s) => (s.dept || "").trim() !== ""));
-    return [...groups.values()]
-        .map((g) => g.label)
-        .sort(compareByDeptDegree);
+// Department/Degree options are shared with the table filter bar —
+// see getPresentDepartmentOptions() / getPresentDegreeOptions() above.
+
+function populateExportDegreeSelect(department) {
+    exportDeptSelect.innerHTML = `<option value="">All Degrees</option>` +
+        getPresentDegreeOptions(department)
+            .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+            .join("");
+    exportDeptSelect.value = "";
 }
 
 function getFilteredExportList() {
+    const department = exportDepartmentSelect ? exportDepartmentSelect.value : "";
     const dept = exportDeptSelect.value;
     const key = normalizeDeptKey(dept);
-    let filtered = dept ? students.filter((s) => normalizeDeptKey(s.dept) === key) : students;
+
+    let filtered = students;
+
+    if (department) {
+        filtered = filtered.filter((s) => departmentForStudent(s.dept) === department);
+    }
+
+    if (dept) {
+        filtered = filtered.filter((s) => normalizeDeptKey(s.dept) === key);
+    }
 
     const year = exportYearSelect ? exportYearSelect.value : "";
     if (year) {
@@ -1318,6 +1457,17 @@ function getFilteredExportList() {
 
     // Apply sorting by department, gender, and name
     return sortStudentsByDeptAndGender(filtered);
+}
+
+// The label shown at the top of the PDF / used for the filename — reflects
+// whichever of Department / Degree the user actually narrowed down to.
+function buildExportScopeLabel() {
+    const department = exportDepartmentSelect ? exportDepartmentSelect.value : "";
+    const degree = exportDeptSelect.value;
+
+    if (degree) return degree;
+    if (department) return `${department} (All Degrees)`;
+    return "All Departments";
 }
 
 function updateExportSummary() {
@@ -1329,16 +1479,29 @@ if (exportBtn) {
     exportBtn.onclick = () => {
         teamMenu.classList.remove("show");
 
-        exportDeptSelect.innerHTML = `<option value="">All Degrees</option>` +
-            getExportDeptOptions()
-                .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
-                .join("");
+        if (exportDepartmentSelect) {
+            exportDepartmentSelect.innerHTML = `<option value="">All Departments</option>` +
+                getPresentDepartmentOptions()
+                    .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+                    .join("");
+            exportDepartmentSelect.value = "";
+        }
+
+        populateExportDegreeSelect("");
 
         if (exportYearSelect) exportYearSelect.value = "";
 
         updateExportSummary();
         exportPopup.classList.add("active");
     };
+}
+
+if (exportDepartmentSelect) {
+    exportDepartmentSelect.addEventListener("change", () => {
+        // Degree filter narrows to whatever department is now selected
+        populateExportDegreeSelect(exportDepartmentSelect.value);
+        updateExportSummary();
+    });
 }
 
 if (exportDeptSelect) {
@@ -1500,8 +1663,10 @@ function generateStudentsPDF(list, deptLabel, yearLabel) {
         // Broken into year sections so year I and year II (etc.) don't mix
         drawYearSections(doc, sortedList, 40);
     } else {
-        // All departments export - show each department separately
-        doc.text(`All Departments${yearSuffix} — ${sortedList.length} student${sortedList.length === 1 ? "" : "s"}`, 14, 26);
+        // Multiple degrees export (either "All Departments", or one
+        // department with several degrees under it) - show each degree
+        // separately, grouped under a shared scope label
+        doc.text(`${deptLabel}${yearSuffix} — ${sortedList.length} student${sortedList.length === 1 ? "" : "s"}`, 14, 26);
         doc.text(`Exported on ${new Date().toLocaleDateString()}`, 14, 32);
 
         // Group by department (already sorted department-first, degree
@@ -1559,7 +1724,7 @@ if (exportDownloadBtn) {
             alert("No students to export for this selection.");
             return;
         }
-        const deptLabel = exportDeptSelect.value || "All Degrees";
+        const deptLabel = buildExportScopeLabel();
         const yearLabel = exportYearSelect && exportYearSelect.value ? `Year ${exportYearSelect.value}` : "";
         const doc = generateStudentsPDF(list, deptLabel, yearLabel);
         doc.save(exportFileName(deptLabel, yearLabel));
@@ -1574,7 +1739,7 @@ if (exportShareBtn) {
             alert("No students to export for this selection.");
             return;
         }
-        const deptLabel = exportDeptSelect.value || "All Degrees";
+        const deptLabel = buildExportScopeLabel();
         const yearLabel = exportYearSelect && exportYearSelect.value ? `Year ${exportYearSelect.value}` : "";
         const doc = generateStudentsPDF(list, deptLabel, yearLabel);
         const fileName = exportFileName(deptLabel, yearLabel);
