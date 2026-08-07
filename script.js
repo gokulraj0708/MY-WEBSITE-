@@ -267,6 +267,11 @@ const logoutBtn = document.getElementById("logoutBtn");
 const logoutConfirmOverlay = document.getElementById("logoutConfirmOverlay");
 const logoutYesBtn = document.getElementById("logoutYesBtn");
 const logoutCancelBtn = document.getElementById("logoutCancelBtn");
+const deleteConfirmOverlay = document.getElementById("deleteConfirmOverlay");
+const deleteConfirmName = document.getElementById("deleteConfirmName");
+const deleteYesBtn = document.getElementById("deleteYesBtn");
+const deleteCancelBtn = document.getElementById("deleteCancelBtn");
+let pendingDeleteId = null;
 
 let isSignupMode = false;
 
@@ -400,6 +405,24 @@ logoutCancelBtn.onclick = () => {
 logoutYesBtn.onclick = () => {
     logoutConfirmOverlay.classList.remove("active");
     auth.signOut();
+};
+
+deleteCancelBtn.onclick = () => {
+    deleteConfirmOverlay.classList.remove("active");
+    pendingDeleteId = null;
+};
+
+deleteYesBtn.onclick = () => {
+    deleteConfirmOverlay.classList.remove("active");
+
+    if (!pendingDeleteId) return;
+
+    const idToDelete = pendingDeleteId;
+    pendingDeleteId = null;
+
+    studentsCollection().doc(idToDelete).delete().catch(() => {
+        alert("Could not delete. Please check your connection and try again.");
+    });
 };
 
 const googleSignInBtn = document.getElementById("googleSignInBtn");
@@ -930,13 +953,12 @@ function editStudent(id){
 
 function deleteStudent(id){
 
-    if(confirm("Delete this student?")){
+    const student = students.find((s) => s.id === id);
+    if (!student) return;
 
-        studentsCollection().doc(id).delete().catch(() => {
-            alert("Could not delete. Please check your connection and try again.");
-        });
-
-    }
+    pendingDeleteId = id;
+    deleteConfirmName.textContent = student.name;
+    deleteConfirmOverlay.classList.add("active");
 
 }
 

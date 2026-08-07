@@ -1930,6 +1930,57 @@ header{
     background:#c0392b;
 }
 
+#deleteConfirmOverlay{
+    position:fixed;
+    inset:0;
+    z-index:6000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:rgba(0,0,0,.5);
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .25s ease, visibility .25s ease;
+}
+
+#deleteConfirmOverlay.active{
+    opacity:1;
+    visibility:visible;
+}
+
+.delete-confirm-box{
+    transform:scale(.85) translateY(10px);
+    opacity:0;
+    transition:transform .25s ease, opacity .25s ease;
+}
+
+#deleteConfirmOverlay.active .delete-confirm-box{
+    transform:scale(1) translateY(0);
+    opacity:1;
+}
+
+.delete-confirm-box p strong{
+    color:#222;
+}
+
+#deleteCancelBtn{
+    background:#f1f1f1;
+    color:#444;
+}
+
+#deleteCancelBtn:hover{
+    background:#e2e2e2;
+}
+
+#deleteYesBtn{
+    background:#e74c3c;
+    color:#fff;
+}
+
+#deleteYesBtn:hover{
+    background:#c0392b;
+}
+
 /* ================= SEARCH SUGGESTIONS ================= */
 
 .search-wrapper{
