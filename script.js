@@ -267,11 +267,6 @@ const logoutBtn = document.getElementById("logoutBtn");
 const logoutConfirmOverlay = document.getElementById("logoutConfirmOverlay");
 const logoutYesBtn = document.getElementById("logoutYesBtn");
 const logoutCancelBtn = document.getElementById("logoutCancelBtn");
-const deleteConfirmOverlay = document.getElementById("deleteConfirmOverlay");
-const deleteConfirmName = document.getElementById("deleteConfirmName");
-const deleteYesBtn = document.getElementById("deleteYesBtn");
-const deleteCancelBtn = document.getElementById("deleteCancelBtn");
-let pendingDeleteId = null;
 
 let isSignupMode = false;
 
@@ -340,76 +335,29 @@ function getFriendlyAuthError(code) {
 const forgotPasswordLink = document.getElementById("forgotPasswordLink");
 const authInfo = document.getElementById("authInfo");
 
-const forgotPasswordPopup = document.getElementById("forgotPasswordPopup");
-const forgotPasswordEmail = document.getElementById("forgotPasswordEmail");
-const forgotPasswordError = document.getElementById("forgotPasswordError");
-const forgotPasswordCancelBtn = document.getElementById("forgotPasswordCancelBtn");
-const forgotPasswordSendBtn = document.getElementById("forgotPasswordSendBtn");
-const closeForgotPassword = document.getElementById("closeForgotPassword");
-
-const resetSentPopup = document.getElementById("resetSentPopup");
-const resetSentEmail = document.getElementById("resetSentEmail");
-const resetSentOkBtn = document.getElementById("resetSentOkBtn");
-const closeResetSent = document.getElementById("closeResetSent");
-
-function openForgotPasswordPopup(){
-    authError.textContent = "";
-    authInfo.textContent = "";
-    forgotPasswordError.textContent = "";
-    forgotPasswordEmail.value = authEmail.value.trim();
-    forgotPasswordPopup.classList.add("active");
-    forgotPasswordEmail.focus();
-}
-
-function closeForgotPasswordPopup(){
-    forgotPasswordPopup.classList.remove("active");
-    forgotPasswordError.textContent = "";
-}
-
 forgotPasswordLink.onclick = (e) => {
     e.preventDefault();
-    openForgotPasswordPopup();
-};
+    authError.textContent = "";
+    authInfo.textContent = "";
 
-forgotPasswordCancelBtn.onclick = closeForgotPasswordPopup;
-closeForgotPassword.onclick = closeForgotPasswordPopup;
-
-forgotPasswordSendBtn.onclick = () => {
-    const email = forgotPasswordEmail.value.trim();
-    forgotPasswordError.textContent = "";
+    const email = authEmail.value.trim();
 
     if (!email) {
-        forgotPasswordError.textContent = "Please enter your email address.";
-        forgotPasswordEmail.focus();
+        authError.textContent = "Enter your email above first, then tap 'Forgot password?'.";
+        authEmail.focus();
         return;
     }
 
-    forgotPasswordSendBtn.disabled = true;
-    forgotPasswordSendBtn.textContent = "Sending...";
-
     auth.sendPasswordResetEmail(email)
         .then(() => {
-            closeForgotPasswordPopup();
-            resetSentEmail.textContent = email;
-            resetSentPopup.classList.add("active");
+            authInfo.textContent = `Password reset link sent to ${email}. Check your inbox. If you don't see it, please check your Gmail spam/junk folder.`;
         })
         .catch((err) => {
-            forgotPasswordError.textContent = err.code === "auth/user-not-found"
+            authError.textContent = err.code === "auth/user-not-found"
                 ? "No account found with that email."
                 : getFriendlyAuthError(err.code);
-        })
-        .finally(() => {
-            forgotPasswordSendBtn.disabled = false;
-            forgotPasswordSendBtn.textContent = "Send Reset Link";
         });
 };
-
-function closeResetSentPopup(){
-    resetSentPopup.classList.remove("active");
-}
-
-resetSentOkBtn.onclick = closeResetSentPopup;
-closeResetSent.onclick = closeResetSentPopup;
 
 const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 
@@ -440,6 +388,142 @@ resetPasswordBtn.onclick = () => {
         });
 };
 
+/* ================= MANAGE USERS (roles) ================= */
+
+const manageUsersBtn = document.getElementById("manageUsersBtn");
+const manageUsersPopup = document.getElementById("manageUsersPopup");
+const membersListContent = document.getElementById("membersListContent");
+const addMemberEmail = document.getElementById("addMemberEmail");
+const addMemberRole = document.getElementById("addMemberRole");
+const addMemberBtn = document.getElementById("addMemberBtn");
+const addMemberError = document.getElementById("addMemberError");
+
+let unsubscribeMembers = null;
+
+function roleLabel(role) {
+    if (role === "staff") return "Staff";
+    if (role === "viewer") return "Viewer";
+    return role;
+}
+
+function renderMembersList(members) {
+    if (members.length === 0) {
+        membersListContent.innerHTML = `<p class="members-empty">No one added yet. Add someone below.</p>`;
+        return;
+    }
+
+    membersListContent.innerHTML = members.map((m) => `
+        <div class="member-row">
+            <div class="member-row-info">
+                <div class="member-row-name">${m.name || m.email || m.uid}</div>
+                ${m.name ? `<div class="member-row-email">${m.email || ""}</div>` : ""}
+            </div>
+            <select onchange="changeMemberRole('${m.uid}', this.value)">
+                <option value="staff" ${m.role === "staff" ? "selected" : ""}>Staff</option>
+                <option value="viewer" ${m.role === "viewer" ? "selected" : ""}>Viewer</option>
+            </select>
+            <button type="button" class="member-row-remove" title="Remove" onclick="removeMember('${m.uid}')">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    `).join("");
+}
+
+function changeMemberRole(uid, newRole) {
+    if (currentRole !== "admin") return;
+    membersCollection().doc(uid).update({ role: newRole }).catch(() => {
+        alert("Could not update role. Please check your connection and try again.");
+    });
+}
+
+function removeMember(uid) {
+    if (currentRole !== "admin") return;
+    if (!confirm("Remove this person's access?")) return;
+
+    membersCollection().doc(uid).delete().catch(() => {
+        alert("Could not remove access. Please check your connection and try again.");
+    });
+}
+
+if (manageUsersBtn) {
+    manageUsersBtn.onclick = () => {
+        if (currentRole !== "admin") return;
+        teamMenu.classList.remove("show");
+
+        addMemberEmail.value = "";
+        addMemberError.textContent = "";
+        membersListContent.innerHTML = `<p class="members-empty">Loading...</p>`;
+
+        if (unsubscribeMembers) unsubscribeMembers();
+        unsubscribeMembers = membersCollection().onSnapshot((snap) => {
+            const members = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+            renderMembersList(members);
+        }, () => {
+            membersListContent.innerHTML = `<p class="members-empty">Could not load users.</p>`;
+        });
+
+        manageUsersPopup.classList.add("active");
+    };
+}
+
+document.getElementById("closeManageUsers").onclick = function () {
+    manageUsersPopup.classList.remove("active");
+    if (unsubscribeMembers) {
+        unsubscribeMembers();
+        unsubscribeMembers = null;
+    }
+};
+
+addMemberBtn.onclick = () => {
+    if (currentRole !== "admin") return;
+
+    const email = addMemberEmail.value.trim().toLowerCase();
+    const role = addMemberRole.value;
+    addMemberError.textContent = "";
+
+    if (!email) {
+        addMemberError.textContent = "Enter their email address.";
+        return;
+    }
+
+    if (currentUser && email === currentUser.email.toLowerCase()) {
+        addMemberError.textContent = "That's your own account.";
+        return;
+    }
+
+    addMemberBtn.disabled = true;
+    addMemberBtn.textContent = "Adding...";
+
+    db.collection("users").where("email", "==", email).limit(1).get()
+        .then((snap) => {
+            if (snap.empty) {
+                addMemberError.textContent = "No account with that email yet. Ask them to sign up first, then add them.";
+                return;
+            }
+
+            const foundUid = snap.docs[0].id;
+            const foundName = snap.docs[0].data().name || "";
+
+            return membersCollection().doc(foundUid).set({
+                uid: foundUid,
+                email: email,
+                name: foundName,
+                role: role,
+                addedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            }).then(() => {
+                addMemberEmail.value = "";
+            });
+        })
+        .catch((err) => {
+            addMemberError.textContent = "Something went wrong. Please try again.";
+            console.error(err);
+        })
+        .finally(() => {
+            addMemberBtn.disabled = false;
+            addMemberBtn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Add`;
+        });
+};
+
 logoutBtn.onclick = () => {
     teamMenu.classList.remove("show");
     logoutConfirmOverlay.classList.add("active");
@@ -452,24 +536,6 @@ logoutCancelBtn.onclick = () => {
 logoutYesBtn.onclick = () => {
     logoutConfirmOverlay.classList.remove("active");
     auth.signOut();
-};
-
-deleteCancelBtn.onclick = () => {
-    deleteConfirmOverlay.classList.remove("active");
-    pendingDeleteId = null;
-};
-
-deleteYesBtn.onclick = () => {
-    deleteConfirmOverlay.classList.remove("active");
-
-    if (!pendingDeleteId) return;
-
-    const idToDelete = pendingDeleteId;
-    pendingDeleteId = null;
-
-    studentsCollection().doc(idToDelete).delete().catch(() => {
-        alert("Could not delete. Please check your connection and try again.");
-    });
 };
 
 const googleSignInBtn = document.getElementById("googleSignInBtn");
@@ -488,6 +554,77 @@ googleSignInBtn.onclick = () => {
 // and on ANY device the moment that user logs in.
 let authInitialized = false;
 
+let workspaceOwnerUid = null;   // whose students/attendance data we're viewing
+let currentRole = "admin";      // 'admin' | 'staff' | 'viewer'
+let unsubscribeMembership = null;
+let workspaceResolveFailed = false; // true if resolveWorkspace() couldn't determine the real role
+
+// So an admin can add someone by typing their email, every account gets
+// a small public-ish lookup entry (email -> uid) written on every login.
+function ensureUserDirectoryEntry(user) {
+    if (!user || !user.email) return;
+    db.collection("users").doc(user.uid).set({
+        email: user.email,
+        name: getUserDisplayName(user),
+    }, { merge: true }).catch(() => {});
+}
+
+// Figures out which workspace this login should see: their own (they're
+// the Admin) or someone else's, if an admin has added them as Staff/Viewer.
+function resolveWorkspace(uid) {
+    return db.collectionGroup("members")
+        .where("uid", "==", uid)
+        .limit(1)
+        .get()
+        .then((snap) => {
+            if (snap.empty) {
+                workspaceOwnerUid = uid;
+                currentRole = "admin";
+                return;
+            }
+            const memberDoc = snap.docs[0];
+            workspaceOwnerUid = memberDoc.ref.parent.parent.id;
+            currentRole = memberDoc.data().role || "viewer";
+        })
+        .catch((err) => {
+            // IMPORTANT: never default to "admin" here. If this lookup fails
+            // (e.g. a missing Firestore index for the collectionGroup query,
+            // or a rules/connection error) we don't actually know whether
+            // this account is an Admin, Staff, or Viewer — silently treating
+            // them as Admin would wrongly show Manage Users / import / export
+            // to a Staff or Viewer account. Fail to the most restrictive
+            // role instead, and surface the error so it gets noticed.
+            console.error("Workspace resolve error:", err);
+            workspaceOwnerUid = uid;
+            currentRole = "viewer";
+            workspaceResolveFailed = true;
+        });
+}
+
+function watchOwnMembership(uid) {
+    if (unsubscribeMembership) {
+        unsubscribeMembership();
+        unsubscribeMembership = null;
+    }
+
+    if (workspaceOwnerUid === uid) return; // owner/admin of own data, nothing to watch
+
+    unsubscribeMembership = db.collection("students")
+        .doc(workspaceOwnerUid)
+        .collection("members")
+        .doc(uid)
+        .onSnapshot((doc) => {
+            if (!doc.exists) {
+                // Access was removed — send them back to their own (empty) workspace.
+                location.reload();
+                return;
+            }
+            currentRole = doc.data().role || "viewer";
+            applyRolePermissions();
+            renderStudents();
+        });
+}
+
 auth.onAuthStateChanged((user) => {
     const wasLoggedOut = !currentUser;
     currentUser = user;
@@ -495,6 +632,10 @@ auth.onAuthStateChanged((user) => {
     if (unsubscribeStudents) {
         unsubscribeStudents();
         unsubscribeStudents = null;
+    }
+    if (unsubscribeMembership) {
+        unsubscribeMembership();
+        unsubscribeMembership = null;
     }
 
     updateCurrentUserDisplay(user);
@@ -514,30 +655,50 @@ auth.onAuthStateChanged((user) => {
         // Show placeholders while Firestore fetches this user's data.
         renderSkeleton();
 
-        // One-time migration: older accounts stored every student as a
-        // single array field. Copy those into individual documents (once)
-        // so simultaneous logins can never overwrite each other's edits.
-        migrateOldStudentsIfNeeded(user.uid).finally(() => {
+        ensureUserDirectoryEntry(user);
 
-            // Real-time listener: keeps this user's data in sync
-            // across every device, live, no manual refresh needed.
-            unsubscribeStudents = db.collection("students")
-                .doc(user.uid)
-                .collection("list")
-                .onSnapshot((snapshot) => {
-                    students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-                    refreshTableFilterOptions();
-                    applyFilters();
-                }, (err) => {
-                    console.error("Sync error:", err);
-                    renderLoadError(err);
-                });
+        workspaceResolveFailed = false;
+        resolveWorkspace(user.uid).then(() => {
+            applyRolePermissions();
 
+            if (workspaceResolveFailed) {
+                renderLoadError({ code: "workspace-resolve-failed" });
+                return;
+            }
+
+            watchOwnMembership(user.uid);
+
+            // One-time migration: older accounts stored every student as a
+            // single array field. Only run this for the actual data owner —
+            // never for someone viewing another admin's workspace.
+            const migration = workspaceOwnerUid === user.uid
+                ? migrateOldStudentsIfNeeded(user.uid)
+                : Promise.resolve();
+
+            migration.finally(() => {
+
+                // Real-time listener: keeps this workspace's data in sync
+                // across every device/member, live, no manual refresh needed.
+                unsubscribeStudents = db.collection("students")
+                    .doc(workspaceOwnerUid)
+                    .collection("list")
+                    .onSnapshot((snapshot) => {
+                        students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+                        refreshTableFilterOptions();
+                        applyFilters();
+                    }, (err) => {
+                        console.error("Sync error:", err);
+                        renderLoadError(err);
+                    });
+
+            });
         });
     } else {
         appContent.style.display = "none";
         authScreen.style.display = "flex";
         students = [];
+        workspaceOwnerUid = null;
+        currentRole = "admin";
         selectedDepartment = "";
         selectedDegree = "";
         selectedYear = "";
@@ -559,6 +720,30 @@ auth.onAuthStateChanged((user) => {
 
     authInitialized = true;
 });
+
+// Shows/hides everything that depends on the current user's role. Called
+// once the workspace/role is known, and again any time the role changes.
+function applyRolePermissions() {
+    const isAdmin = currentRole === "admin";
+    const isViewer = currentRole === "viewer";
+
+    if (addBtn) addBtn.style.display = isViewer ? "none" : "";
+    if (importBtn) importBtn.style.display = isAdmin ? "" : "none";
+    if (exportTabStudents) exportTabStudents.style.display = isAdmin ? "" : "none";
+    if (attendanceBtn) attendanceBtn.style.display = isViewer ? "none" : "";
+    if (manageUsersBtn) manageUsersBtn.style.display = isAdmin ? "" : "none";
+
+    const badge = document.getElementById("currentRoleBadge");
+    if (badge) {
+        if (isAdmin) {
+            badge.style.display = "none";
+        } else {
+            badge.textContent = currentRole === "staff" ? "Staff" : "Viewer";
+            badge.className = `role-badge role-badge-${currentRole}`;
+            badge.style.display = "inline-block";
+        }
+    }
+}
 
 function getUserDisplayName(user) {
     if (!user) return "User";
@@ -617,7 +802,11 @@ function migrateOldStudentsIfNeeded(uid) {
 }
 
 function studentsCollection() {
-    return db.collection("students").doc(currentUser.uid).collection("list");
+    return db.collection("students").doc(workspaceOwnerUid).collection("list");
+}
+
+function membersCollection() {
+    return db.collection("students").doc(workspaceOwnerUid).collection("members");
 }
 
 
@@ -628,6 +817,7 @@ let lastDegree = "";
 let lastDegreeOther = "";
 
 addBtn.onclick = () => {
+    if (currentRole === "viewer") return;
     editId = null;
     clearForm(true);
     popup.classList.add("active");
@@ -796,6 +986,8 @@ function renderLoadError(err) {
 
     const message = err && err.code === "permission-denied"
         ? "Access denied. Your Firestore security rules may need updating for this account."
+        : err && err.code === "workspace-resolve-failed"
+        ? "Couldn't verify your account access. Please refresh the page — if this keeps happening, tell the app admin."
         : "Couldn't load your students. Check your connection and try again.";
 
     table.innerHTML = `
@@ -916,6 +1108,21 @@ function renderStudents(list = students) {
             `;
         }
 
+        const canManage = currentRole === "admin" || currentRole === "staff";
+        const actionButtonsHtml = canManage ? `
+                <button class="action-btn edit-btn"
+                onclick="editStudent('${student.id}')">
+                <i class="fa-solid fa-pen"></i>
+                </button>
+
+                ${currentRole === "admin" ? `
+                <button class="action-btn delete-btn"
+                onclick="deleteStudent('${student.id}')">
+                <i class="fa-solid fa-trash"></i>
+                </button>
+                ` : ""}
+        ` : `<span class="no-actions">—</span>`;
+
         table.innerHTML += `
         <tr class="fade-row">
             <td><a href="#" class="name-link" onclick="showStudentInfo('${student.id}'); return false;">${student.name}</a></td>
@@ -925,15 +1132,7 @@ function renderStudents(list = students) {
             <td>${student.gender}</td>
 
             <td>
-                <button class="action-btn edit-btn"
-                onclick="editStudent('${student.id}')">
-                <i class="fa-solid fa-pen"></i>
-                </button>
-
-                <button class="action-btn delete-btn"
-                onclick="deleteStudent('${student.id}')">
-                <i class="fa-solid fa-trash"></i>
-                </button>
+                ${actionButtonsHtml}
             </td>
 
         </tr>
@@ -955,6 +1154,8 @@ function renderStudents(list = students) {
 
 
 function editStudent(id){
+
+    if (currentRole === "viewer") return;
 
     const student = students.find((s) => s.id === id);
     if (!student) return;
@@ -1000,12 +1201,15 @@ function editStudent(id){
 
 function deleteStudent(id){
 
-    const student = students.find((s) => s.id === id);
-    if (!student) return;
+    if (currentRole !== "admin") return;
 
-    pendingDeleteId = id;
-    deleteConfirmName.textContent = student.name;
-    deleteConfirmOverlay.classList.add("active");
+    if(confirm("Delete this student?")){
+
+        studentsCollection().doc(id).delete().catch(() => {
+            alert("Could not delete. Please check your connection and try again.");
+        });
+
+    }
 
 }
 
@@ -1462,6 +1666,47 @@ const exportSummary = document.getElementById("exportSummary");
 const exportCancelBtn = document.getElementById("exportCancelBtn");
 const exportShareBtn = document.getElementById("exportShareBtn");
 const exportDownloadBtn = document.getElementById("exportDownloadBtn");
+const exportTabStudents = document.getElementById("exportTabStudents");
+const exportTabAttendance = document.getElementById("exportTabAttendance");
+const exportAttendanceDates = document.getElementById("exportAttendanceDates");
+const exportAttendanceFromDate = document.getElementById("exportAttendanceFromDate");
+const exportAttendanceToDate = document.getElementById("exportAttendanceToDate");
+const exportStudentButtons = document.getElementById("exportStudentButtons");
+const exportAttendanceButtons = document.getElementById("exportAttendanceButtons");
+const exportStudentHint = document.getElementById("exportStudentHint");
+const exportAttendanceHint = document.getElementById("exportAttendanceHint");
+const exportAttendanceCancelBtn = document.getElementById("exportAttendanceCancelBtn");
+const exportAttendanceShareBtn = document.getElementById("exportAttendanceShareBtn");
+const exportAttendanceDownloadBtn = document.getElementById("exportAttendanceDownloadBtn");
+
+function todayDateStr() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function dateStrToDate(dateStr) {
+    return new Date(dateStr + "T00:00:00");
+}
+
+// Every date string from fromStr to toStr (inclusive), both ends included.
+// Capped at 62 days so a huge accidental range can't trigger hundreds of
+// Firestore reads at once.
+const MAX_ATTENDANCE_RANGE_DAYS = 62;
+
+function getDateRange(fromStr, toStr) {
+    const dates = [];
+    const current = dateStrToDate(fromStr);
+    const end = dateStrToDate(toStr);
+    const pad = (n) => String(n).padStart(2, "0");
+
+    while (current <= end && dates.length < MAX_ATTENDANCE_RANGE_DAYS) {
+        dates.push(`${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`);
+        current.setDate(current.getDate() + 1);
+    }
+
+    return dates;
+}
 
 if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -1543,7 +1788,63 @@ function buildExportScopeLabel() {
 
 function updateExportSummary() {
     const list = getFilteredExportList();
-    exportSummary.textContent = `${list.length} student${list.length === 1 ? "" : "s"} will be exported`;
+
+    if (exportMode === "attendance") {
+        const fromStr = exportAttendanceFromDate.value || todayDateStr();
+        const toStr = exportAttendanceToDate.value || fromStr;
+        const rangeLabel = fromStr === toStr ? `on ${fromStr}` : `from ${fromStr} to ${toStr}`;
+        exportSummary.textContent = `Attendance for ${list.length} student${list.length === 1 ? "" : "s"} ${rangeLabel}`;
+    } else {
+        exportSummary.textContent = `${list.length} student${list.length === 1 ? "" : "s"} will be exported`;
+    }
+}
+
+let exportMode = "students"; // "students" | "attendance"
+
+function setExportMode(mode) {
+    exportMode = mode;
+    const isAttendance = mode === "attendance";
+
+    exportTabStudents.classList.toggle("active", !isAttendance);
+    exportTabAttendance.classList.toggle("active", isAttendance);
+
+    exportAttendanceDates.style.display = isAttendance ? "grid" : "none";
+    exportStudentButtons.style.display = isAttendance ? "none" : "flex";
+    exportAttendanceButtons.style.display = isAttendance ? "flex" : "none";
+    exportStudentHint.style.display = isAttendance ? "none" : "block";
+    exportAttendanceHint.style.display = isAttendance ? "block" : "none";
+
+    updateExportSummary();
+}
+
+if (exportTabStudents) {
+    exportTabStudents.onclick = () => {
+        if (currentRole !== "admin") return;
+        setExportMode("students");
+    };
+}
+
+if (exportTabAttendance) {
+    exportTabAttendance.onclick = () => setExportMode("attendance");
+}
+
+// Keep From <= To at all times, and neither can be in the future
+if (exportAttendanceFromDate && exportAttendanceToDate) {
+    exportAttendanceFromDate.addEventListener("change", () => {
+        exportAttendanceToDate.min = exportAttendanceFromDate.value;
+        if (exportAttendanceToDate.value && exportAttendanceToDate.value < exportAttendanceFromDate.value) {
+            exportAttendanceToDate.value = exportAttendanceFromDate.value;
+        }
+        updateExportSummary();
+    });
+
+    exportAttendanceToDate.addEventListener("change", () => {
+        exportAttendanceFromDate.max = exportAttendanceToDate.value;
+        if (exportAttendanceFromDate.value && exportAttendanceFromDate.value > exportAttendanceToDate.value) {
+            exportAttendanceFromDate.value = exportAttendanceToDate.value;
+        }
+        updateExportSummary();
+    });
 }
 
 if (exportBtn) {
@@ -1562,7 +1863,16 @@ if (exportBtn) {
 
         if (exportYearSelect) exportYearSelect.value = "";
 
-        updateExportSummary();
+        if (exportAttendanceFromDate && exportAttendanceToDate) {
+            const today = todayDateStr();
+            exportAttendanceFromDate.max = today;
+            exportAttendanceToDate.max = today;
+            exportAttendanceFromDate.value = today;
+            exportAttendanceToDate.value = today;
+            exportAttendanceToDate.min = today;
+        }
+
+        setExportMode(currentRole === "admin" ? "students" : "attendance");
         exportPopup.classList.add("active");
     };
 }
@@ -1846,6 +2156,7 @@ const openFileManagerBtn = document.getElementById("openFileManagerBtn");
 
 if (importBtn) {
     importBtn.onclick = () => {
+        if (currentRole !== "admin") return;
         teamMenu.classList.remove("show");
         importPopup.classList.add("active");
     };
@@ -1981,4 +2292,508 @@ if (importFileInput) {
             importFileInput.value = "";
         }
     });
+}
+
+/* ================= ATTENDANCE ================= */
+
+// Each day's attendance is stored as one small document per student, at
+// students/{uid}/attendance/{YYYY-MM-DD}/records/{studentId} — never one
+// big shared document — so two staff marking different classes on the
+// same day (or fixing a mistake later) can never overwrite each other.
+function attendanceRecordsRef(dateStr) {
+    return db.collection("students")
+        .doc(workspaceOwnerUid)
+        .collection("attendance")
+        .doc(dateStr)
+        .collection("records");
+}
+
+const attendanceBtn = document.getElementById("attendanceBtn");
+const attendancePopup = document.getElementById("attendancePopup");
+const attendanceDateInput = document.getElementById("attendanceDate");
+const attendanceDepartmentSelect = document.getElementById("attendanceDepartment");
+const attendanceDegreeSelect = document.getElementById("attendanceDegree");
+const attendanceYearSelect = document.getElementById("attendanceYear");
+const attendanceListEl = document.getElementById("attendanceList");
+const attendanceCancelBtn = document.getElementById("attendanceCancelBtn");
+const attendanceSaveBtn = document.getElementById("attendanceSaveBtn");
+
+// studentId -> [hour1..hour5] booleans (true = present), for whatever
+// date/filter is currently loaded in the popup
+let attendanceState = {};
+
+function populateAttendanceDegreeSelect(department) {
+    attendanceDegreeSelect.innerHTML = `<option value="">All Degrees</option>` +
+        getPresentDegreeOptions(department)
+            .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+            .join("");
+    attendanceDegreeSelect.value = "";
+}
+
+function getAttendanceFilteredStudents() {
+    const department = attendanceDepartmentSelect.value;
+    const degree = attendanceDegreeSelect.value;
+    const year = attendanceYearSelect.value;
+
+    let filtered = students;
+
+    if (department) {
+        filtered = filtered.filter((s) => departmentForStudent(s.dept) === department);
+    }
+
+    if (degree) {
+        const key = normalizeDeptKey(degree);
+        filtered = filtered.filter((s) => normalizeDeptKey(s.dept) === key);
+    }
+
+    if (year) {
+        filtered = filtered.filter((s) => (s.year || "") === year);
+    }
+
+    return sortStudentsByDeptAndGender(filtered);
+}
+
+function renderAttendanceList() {
+    const list = getAttendanceFilteredStudents();
+
+    if (list.length === 0) {
+        attendanceListEl.innerHTML = `<p class="attendance-empty">No students match this selection.</p>`;
+        return;
+    }
+
+    attendanceListEl.innerHTML = list.map((s) => {
+        const hours = attendanceState[s.id] || [true, true, true, true, true];
+
+        const hourBtns = hours.map((present, i) => `
+            <button type="button"
+                class="attendance-hour-btn ${present ? "" : "absent"}"
+                onclick="toggleAttendanceHour('${s.id}', ${i})">${present ? "P" : "A"}</button>
+        `).join("");
+
+        return `
+        <div class="attendance-row">
+            <a href="#" class="name-link attendance-student-name" onclick="showStudentInfo('${s.id}'); return false;">${s.name}</a>
+            <div class="attendance-hours">${hourBtns}</div>
+        </div>`;
+    }).join("");
+}
+
+function toggleAttendanceHour(studentId, hourIndex) {
+    if (!attendanceState[studentId]) return;
+    attendanceState[studentId][hourIndex] = !attendanceState[studentId][hourIndex];
+    renderAttendanceList();
+}
+
+async function loadAttendanceForCurrentSelection() {
+    const dateStr = attendanceDateInput.value;
+    if (!dateStr) return;
+
+    const list = getAttendanceFilteredStudents();
+
+    if (list.length === 0) {
+        attendanceState = {};
+        attendanceListEl.innerHTML = `<p class="attendance-empty">No students match this selection.</p>`;
+        return;
+    }
+
+    attendanceListEl.innerHTML = `<p class="attendance-empty">Loading…</p>`;
+
+    // Default everyone to Present — staff only need to tap the hours a
+    // student actually missed, which is the fast/common case.
+    const freshState = {};
+    list.forEach((s) => {
+        freshState[s.id] = [true, true, true, true, true];
+    });
+
+    try {
+        const snapshot = await attendanceRecordsRef(dateStr).get();
+        snapshot.forEach((doc) => {
+            const hours = doc.data().hours;
+            if (freshState[doc.id] && Array.isArray(hours) && hours.length === 5) {
+                freshState[doc.id] = hours;
+            }
+        });
+    } catch (err) {
+        console.error("Attendance load error:", err);
+        attendanceListEl.innerHTML = `<p class="attendance-empty">Couldn't load saved attendance for this date. Check your connection.</p>`;
+        attendanceState = {};
+        return;
+    }
+
+    attendanceState = freshState;
+    renderAttendanceList();
+}
+
+if (attendanceBtn) {
+    attendanceBtn.onclick = () => {
+        if (currentRole === "viewer") return;
+        teamMenu.classList.remove("show");
+
+        attendanceDateInput.max = todayDateStr();
+        if (!attendanceDateInput.value) attendanceDateInput.value = todayDateStr();
+
+        attendanceDepartmentSelect.innerHTML = `<option value="">All Departments</option>` +
+            getPresentDepartmentOptions()
+                .map((d) => `<option value="${d.replace(/"/g, "&quot;")}">${d}</option>`)
+                .join("");
+        attendanceDepartmentSelect.value = "";
+
+        populateAttendanceDegreeSelect("");
+        attendanceYearSelect.value = "";
+
+        attendancePopup.classList.add("active");
+        loadAttendanceForCurrentSelection();
+    };
+}
+
+attendanceDateInput.addEventListener("change", loadAttendanceForCurrentSelection);
+
+attendanceDepartmentSelect.addEventListener("change", () => {
+    populateAttendanceDegreeSelect(attendanceDepartmentSelect.value);
+    loadAttendanceForCurrentSelection();
+});
+
+attendanceDegreeSelect.addEventListener("change", loadAttendanceForCurrentSelection);
+attendanceYearSelect.addEventListener("change", loadAttendanceForCurrentSelection);
+
+attendanceCancelBtn.onclick = () => {
+    attendancePopup.classList.remove("active");
+};
+
+attendanceSaveBtn.onclick = async () => {
+    if (currentRole === "viewer") return;
+
+    const dateStr = attendanceDateInput.value;
+
+    if (!dateStr) {
+        alert("Please pick a date.");
+        return;
+    }
+
+    const list = getAttendanceFilteredStudents();
+
+    if (list.length === 0) {
+        alert("No students to save attendance for.");
+        return;
+    }
+
+    const originalLabel = attendanceSaveBtn.innerHTML;
+    attendanceSaveBtn.disabled = true;
+    attendanceSaveBtn.textContent = "Saving...";
+
+    const markerName = getUserDisplayName(currentUser);
+    const now = new Date();
+
+    try {
+        const batch = db.batch();
+        const ref = attendanceRecordsRef(dateStr);
+
+        list.forEach((s) => {
+            const hours = attendanceState[s.id] || [true, true, true, true, true];
+            batch.set(ref.doc(s.id), {
+                hours: hours,
+                markedBy: markerName,
+                markedByUid: currentUser.uid,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        });
+
+        await batch.commit();
+
+        attendancePopup.classList.remove("active");
+        showAttendanceRecordReceipt(dateStr, list, markerName, now);
+
+    } catch (err) {
+        console.error("Attendance save error:", err);
+        alert("Couldn't save attendance. Please check your connection and try again.");
+    } finally {
+        attendanceSaveBtn.disabled = false;
+        attendanceSaveBtn.innerHTML = originalLabel;
+    }
+};
+
+/* ---------- attendance record receipt ---------- */
+
+function formatDateDMY(dateStr) {
+    const parts = dateStr.split("-");
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+function formatTimeStamp(date) {
+    const d = String(date.getDate()).padStart(2, "0");
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const y = date.getFullYear();
+    let hours = date.getHours();
+    const mins = String(date.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return `${d}-${m}-${y} ${hours}:${mins} ${ampm}`;
+}
+
+let lastAttendanceRecordText = "";
+
+function showAttendanceRecordReceipt(dateStr, list, markerName, now) {
+    const popup = document.getElementById("attendanceRecordPopup");
+    const content = document.getElementById("attendanceRecordContent");
+    if (!popup || !content) return;
+
+    const dateLabel = formatDateDMY(dateStr);
+    const timeLabel = formatTimeStamp(now);
+
+    let html = `Date: ${dateLabel}\n<span class="record-divider">--------------------------------</span>\n`;
+    let plain = `Attendance Record\n--------------------------------\nDate: ${dateLabel}\n`;
+
+    list.forEach((s) => {
+        const hours = attendanceState[s.id] || [true, true, true, true, true];
+        html += `\n<span class="record-student">Student: ${s.name}</span>\n`;
+        plain += `\nStudent: ${s.name}\n`;
+        hours.forEach((present, i) => {
+            const label = present ? "Present" : "Absent";
+            const cls = present ? "record-present" : "record-absent";
+            html += `Hour ${i + 1}: <span class="${cls}">${label}</span>\n`;
+            plain += `Hour ${i + 1}: ${label}\n`;
+        });
+    });
+
+    html += `\n<div class="record-footer">Marked by: ${markerName}\nLast modified: ${timeLabel}</div>`;
+    plain += `\nMarked by: ${markerName}\nLast modified: ${timeLabel}`;
+
+    content.innerHTML = html;
+    lastAttendanceRecordText = plain;
+
+    popup.classList.add("active");
+}
+
+document.getElementById("closeAttendanceRecord").onclick = function () {
+    document.getElementById("attendanceRecordPopup").classList.remove("active");
+};
+
+document.getElementById("attendanceRecordOkBtn").onclick = function () {
+    document.getElementById("attendanceRecordPopup").classList.remove("active");
+};
+
+document.getElementById("copyAttendanceRecordBtn").onclick = function () {
+    const btn = this;
+    navigator.clipboard.writeText(lastAttendanceRecordText).then(() => {
+        const original = btn.innerHTML;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied`;
+        setTimeout(() => { btn.innerHTML = original; }, 1500);
+    }).catch(() => {
+        alert("Could not copy. Please select and copy the text manually.");
+    });
+};
+
+/* ---------- attendance PDF report ---------- */
+
+async function buildAttendanceRecordsMap(dateStr) {
+    const snapshot = await attendanceRecordsRef(dateStr).get();
+    const map = {};
+    snapshot.forEach((doc) => {
+        const hours = doc.data().hours;
+        map[doc.id] = Array.isArray(hours) && hours.length === 5
+            ? hours
+            : [true, true, true, true, true];
+    });
+    return map;
+}
+
+// Fetches every date's records in parallel: { dateStr: { studentId: hours[] } }
+async function buildAttendanceRecordsMapForRange(dateList) {
+    const perDateMaps = await Promise.all(dateList.map((d) => buildAttendanceRecordsMap(d)));
+    const combined = {};
+    dateList.forEach((d, i) => {
+        combined[d] = perDateMaps[i];
+    });
+    return combined;
+}
+
+function formatDateShort(dateStr) {
+    const parts = dateStr.split("-");
+    return `${parts[1]}/${parts[2]}`;
+}
+
+function generateAttendancePDF(list, dateList, recordsByDate, scopeLabel) {
+    const { jsPDF } = window.jspdf;
+    const singleDay = dateList.length === 1;
+    const shortRange = dateList.length > 1 && dateList.length <= 14;
+
+    const doc = new jsPDF({
+        orientation: shortRange && dateList.length > 5 ? "landscape" : "portrait"
+    });
+
+    const dateRangeLabel = singleDay
+        ? dateList[0]
+        : `${dateList[0]} to ${dateList[dateList.length - 1]}`;
+
+    doc.setFontSize(18);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Student Management System", 14, 18);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Attendance Report - ${scopeLabel}`, 14, 26);
+    doc.text(`Date${singleDay ? "" : "s"}: ${dateRangeLabel}`, 14, 32);
+
+    let head, body, columnStyles;
+
+    if (singleDay) {
+        // Full hour-by-hour detail for a single day
+        const recordsMap = recordsByDate[dateList[0]];
+
+        head = [["Name", "Degree", "Year", "1", "2", "3", "4", "5", "Present", "%"]];
+        body = list.map((s) => {
+            const hours = recordsMap[s.id] || [true, true, true, true, true];
+            const presentCount = hours.filter(Boolean).length;
+            const pct = Math.round((presentCount / 5) * 100);
+
+            return [
+                s.name, s.dept, s.year || "-",
+                ...hours.map((h) => (h ? "P" : "A")),
+                `${presentCount}/5`, `${pct}%`
+            ];
+        });
+        columnStyles = { 0: { halign: "left" }, 1: { halign: "left" } };
+
+    } else if (shortRange) {
+        // One column per day, showing that day's present-hours count.
+        // A day with no saved record at all shows "-" and isn't counted
+        // toward the Overall % (so an un-marked holiday can't drag a
+        // student's attendance down).
+        head = [["Name", "Degree", "Year", ...dateList.map(formatDateShort), "Overall %"]];
+
+        body = list.map((s) => {
+            let markedDays = 0;
+            let presentHours = 0;
+
+            const dayCells = dateList.map((d) => {
+                const hours = recordsByDate[d][s.id];
+                if (!hours) return "-";
+                markedDays++;
+                const count = hours.filter(Boolean).length;
+                presentHours += count;
+                return `${count}/5`;
+            });
+
+            const overall = markedDays === 0
+                ? "No data"
+                : `${Math.round((presentHours / (markedDays * 5)) * 100)}%`;
+
+            return [s.name, s.dept, s.year || "-", ...dayCells, overall];
+        });
+        columnStyles = { 0: { halign: "left" }, 1: { halign: "left" } };
+
+    } else {
+        // Long range: per-day columns would be unreadable, so show one
+        // aggregate row per student instead.
+        head = [["Name", "Degree", "Year", "Days Marked", "Present Hours", "Overall %"]];
+
+        body = list.map((s) => {
+            let markedDays = 0;
+            let presentHours = 0;
+
+            dateList.forEach((d) => {
+                const hours = recordsByDate[d][s.id];
+                if (!hours) return;
+                markedDays++;
+                presentHours += hours.filter(Boolean).length;
+            });
+
+            const overall = markedDays === 0
+                ? "No data"
+                : `${Math.round((presentHours / (markedDays * 5)) * 100)}%`;
+
+            return [
+                s.name, s.dept, s.year || "-",
+                markedDays,
+                `${presentHours}/${markedDays * 5}`,
+                overall
+            ];
+        });
+        columnStyles = { 0: { halign: "left" }, 1: { halign: "left" } };
+    }
+
+    doc.autoTable({
+        startY: 38,
+        head: head,
+        body: body,
+        styles: { fontSize: shortRange && dateList.length > 8 ? 7.5 : 8.5, halign: "center" },
+        columnStyles: columnStyles,
+        headStyles: { fillColor: [0, 184, 148] },
+        alternateRowStyles: { fillColor: [235, 253, 248] }
+    });
+
+    return doc;
+}
+
+async function runAttendanceExport(action) {
+    const list = getFilteredExportList();
+
+    if (list.length === 0) {
+        alert("No students to export for this selection.");
+        return;
+    }
+
+    const fromStr = exportAttendanceFromDate.value || todayDateStr();
+    const toStr = exportAttendanceToDate.value || fromStr;
+
+    if (toStr < fromStr) {
+        alert("The 'To' date can't be earlier than the 'From' date.");
+        return;
+    }
+
+    const dateList = getDateRange(fromStr, toStr);
+
+    if (dateList.length === 0) {
+        alert("Please pick a valid date range.");
+        return;
+    }
+
+    const scopeLabel = buildExportScopeLabel();
+    const rangeForFilename = fromStr === toStr ? fromStr : `${fromStr}_to_${toStr}`;
+    const fileName = `attendance_${rangeForFilename}_${scopeLabel.replace(/[^a-z0-9]+/gi, "_")}.pdf`;
+
+    try {
+        const recordsByDate = await buildAttendanceRecordsMapForRange(dateList);
+        const doc = generateAttendancePDF(list, dateList, recordsByDate, scopeLabel);
+
+        if (action === "download") {
+            doc.save(fileName);
+            exportPopup.classList.remove("active");
+            return;
+        }
+
+        const blob = doc.output("blob");
+        const file = new File([blob], fileName, { type: "application/pdf" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: "Attendance Report",
+                text: `Attendance - ${scopeLabel} - ${fromStr === toStr ? fromStr : `${fromStr} to ${toStr}`}`
+            });
+            exportPopup.classList.remove("active");
+        } else {
+            alert("Sharing isn't supported on this device/browser. Use Download instead.");
+        }
+
+    } catch (err) {
+        if (err.name === "AbortError") return;
+        console.error("Attendance export error:", err);
+        alert("Couldn't generate the attendance report. Please check your connection and try again.");
+    }
+}
+
+if (exportAttendanceDownloadBtn) {
+    exportAttendanceDownloadBtn.onclick = () => runAttendanceExport("download");
+}
+
+if (exportAttendanceShareBtn) {
+    exportAttendanceShareBtn.onclick = () => runAttendanceExport("share");
+}
+
+if (exportAttendanceCancelBtn) {
+    exportAttendanceCancelBtn.onclick = () => {
+        exportPopup.classList.remove("active");
+    };
 }

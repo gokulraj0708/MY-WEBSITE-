@@ -71,36 +71,6 @@
             <a href="#" id="authSwitchLink">Sign up</a>
         </p>
     </div>
-
-    <!-- Forgot Password Popup -->
-    <div id="forgotPasswordPopup" class="profile-popup">
-        <div class="profile-box forgot-password-box">
-            <span id="closeForgotPassword" class="popup-close">&times;</span>
-            <div class="forgot-icon"><i class="fa-solid fa-key"></i></div>
-            <h2>Reset your password</h2>
-            <p class="forgot-password-desc">Enter your email and we'll send you a link to reset your password.</p>
-
-            <input type="email" id="forgotPasswordEmail" placeholder="Email">
-            <p id="forgotPasswordError" class="auth-error"></p>
-
-            <div class="buttons forgot-password-buttons">
-                <button id="forgotPasswordCancelBtn" type="button">Cancel</button>
-                <button id="forgotPasswordSendBtn" type="button">Send Reset Link</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reset Link Sent Popup -->
-    <div id="resetSentPopup" class="profile-popup">
-        <div class="profile-box reset-sent-box">
-            <span id="closeResetSent" class="popup-close">&times;</span>
-            <div class="reset-sent-icon"><i class="fa-solid fa-paper-plane"></i></div>
-            <h2>Check your email!</h2>
-            <p>We've sent a password reset link to<br><strong id="resetSentEmail"></strong></p>
-            <p class="reset-sent-hint"><i class="fa-solid fa-circle-info"></i> Didn't get it? Check your spam or junk folder.</p>
-            <button id="resetSentOkBtn" type="button" class="reset-sent-ok-btn">Got it</button>
-        </div>
-    </div>
 </div>
 
 <div id="welcomeScreen">
@@ -134,6 +104,7 @@
                 <div class="current-user" id="currentUserInfo">
                     <i class="fa-solid fa-circle-user"></i>
                     <span id="currentUserName">User</span>
+                    <span id="currentRoleBadge" class="role-badge role-badge-admin" style="display:none;"></span>
                 </div>
 
                 <div class="team-actions">
@@ -142,6 +113,9 @@
                     </button>
                     <button class="team-action-btn" id="resetPasswordBtn">
                         <i class="fa-solid fa-key"></i> Reset Password
+                    </button>
+                    <button class="team-action-btn" id="manageUsersBtn" style="display:none;">
+                        <i class="fa-solid fa-users-gear"></i> Manage Users
                     </button>
                     <button class="team-action-btn team-action-danger" id="logoutBtn">
                         <i class="fa-solid fa-right-from-bracket"></i> Logout
@@ -176,6 +150,10 @@
     </span>
     <span class="breadcrumb-sep">/</span>
     <span class="breadcrumb-item breadcrumb-current" id="breadcrumbCurrent">All Students</span>
+
+    <button id="attendanceBtn" class="breadcrumb-attendance-btn" title="Attendance">
+        <i class="fa-solid fa-clipboard-check"></i> Attendance
+    </button>
 </nav>
 
 <div class="top">
@@ -354,7 +332,16 @@ Add Student
 <!-- Export Popup -->
 <div class="popup" id="exportPopup">
 <div class="popup-content">
-<h2><i class="fa-solid fa-file-export"></i> Export Students</h2>
+<h2><i class="fa-solid fa-file-export"></i> Export</h2>
+
+<div class="export-tabs">
+    <button type="button" class="export-tab active" id="exportTabStudents">
+        <i class="fa-solid fa-users"></i> Student List
+    </button>
+    <button type="button" class="export-tab" id="exportTabAttendance">
+        <i class="fa-solid fa-clipboard-check"></i> Attendance
+    </button>
+</div>
 
 <select id="exportDepartment">
 <option value="">All Departments</option>
@@ -371,15 +358,34 @@ Add Student
 <option value="III">III Year</option>
 </select>
 
+<div class="export-attendance-dates" id="exportAttendanceDates" style="display:none;">
+    <div class="export-date-field">
+        <label for="exportAttendanceFromDate">From</label>
+        <input type="date" id="exportAttendanceFromDate">
+    </div>
+    <div class="export-date-field">
+        <label for="exportAttendanceToDate">To</label>
+        <input type="date" id="exportAttendanceToDate">
+    </div>
+</div>
+
 <p id="exportSummary" class="export-summary"></p>
 
-<div class="buttons export-buttons">
+<div class="buttons export-buttons" id="exportStudentButtons">
 <button id="exportCancelBtn" type="button">Cancel</button>
 <button id="exportShareBtn" type="button"><i class="fa-solid fa-share-nodes"></i> Share</button>
 <button id="exportDownloadBtn" type="button"><i class="fa-solid fa-download"></i> Download</button>
 </div>
 
-<p class="export-hint">Share sends a ready-to-view PDF via WhatsApp, Email, etc. The same PDF can be imported into another account on this app — the exact student data travels with it.</p>
+<div class="buttons export-buttons" id="exportAttendanceButtons" style="display:none;">
+<button id="exportAttendanceCancelBtn" type="button">Cancel</button>
+<button id="exportAttendanceShareBtn" type="button"><i class="fa-solid fa-share-nodes"></i> Share</button>
+<button id="exportAttendanceDownloadBtn" type="button"><i class="fa-solid fa-download"></i> Download</button>
+</div>
+
+<p class="export-hint" id="exportStudentHint">Share sends a ready-to-view PDF via WhatsApp, Email, etc. The same PDF can be imported into another account on this app — the exact student data travels with it.</p>
+
+<p class="export-hint" id="exportAttendanceHint" style="display:none;">Downloads a Present/Absent report for all 5 hours of the selected date, with a daily attendance percentage per student.</p>
 
 </div>
 </div>
@@ -397,6 +403,50 @@ Add Student
 </div>
 
 <p class="import-note"><i class="fa-solid fa-circle-info"></i> Note: Only import PDFs that were exported by another user from this app.</p>
+
+</div>
+</div>
+
+<!-- Attendance Popup -->
+<div class="popup" id="attendancePopup">
+<div class="popup-content attendance-popup-content">
+<h2><i class="fa-solid fa-clipboard-check"></i> Take Attendance</h2>
+
+<div class="attendance-filters">
+<input type="date" id="attendanceDate">
+
+<select id="attendanceDepartment">
+<option value="">All Departments</option>
+</select>
+
+<select id="attendanceDegree">
+<option value="">All Degrees</option>
+</select>
+
+<select id="attendanceYear">
+<option value="">All Years</option>
+<option value="I">I Year</option>
+<option value="II">II Year</option>
+<option value="III">III Year</option>
+</select>
+</div>
+
+<p class="attendance-hint"><i class="fa-solid fa-circle-info"></i> Everyone starts marked Present — tap the hours a student missed. Attendance already saved for this date loads automatically, so you can revisit any day and fix a mistake.</p>
+
+<div id="attendanceListWrap">
+<div class="attendance-list-head">
+<span class="attendance-name-col">Student</span>
+<span class="attendance-hours-col">
+    <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+</span>
+</div>
+<div id="attendanceList" class="attendance-list"></div>
+</div>
+
+<div class="buttons attendance-buttons">
+<button id="attendanceCancelBtn" type="button">Cancel</button>
+<button id="attendanceSaveBtn" type="button"><i class="fa-solid fa-check"></i> Save Attendance</button>
+</div>
 
 </div>
 </div>
@@ -432,6 +482,38 @@ Add Student
     </div>
 </div>
 
+<div id="manageUsersPopup" class="profile-popup">
+    <div class="profile-box stat-list-box manage-users-box">
+        <span id="closeManageUsers">&times;</span>
+        <h2><i class="fa-solid fa-users-gear"></i> Manage Users</h2>
+        <p class="manage-users-desc">Add people to work on your students, and choose what they can do.</p>
+
+        <div class="add-member-form">
+            <input type="email" id="addMemberEmail" placeholder="Their email">
+            <select id="addMemberRole">
+                <option value="staff">Staff</option>
+                <option value="viewer">Viewer</option>
+            </select>
+            <button id="addMemberBtn" type="button"><i class="fa-solid fa-user-plus"></i> Add</button>
+        </div>
+        <p id="addMemberError" class="auth-error"></p>
+
+        <div id="membersListContent" class="stat-list-content members-list"></div>
+    </div>
+</div>
+
+<div id="attendanceRecordPopup" class="profile-popup">
+    <div class="profile-box stat-list-box attendance-record-box">
+        <span id="closeAttendanceRecord">&times;</span>
+        <h2><i class="fa-solid fa-clipboard-check"></i> Attendance Record</h2>
+        <div id="attendanceRecordContent" class="attendance-record-content"></div>
+        <div class="attendance-record-footer">
+            <button id="copyAttendanceRecordBtn" type="button"><i class="fa-solid fa-copy"></i> Copy</button>
+            <button id="attendanceRecordOkBtn" type="button">Done</button>
+        </div>
+    </div>
+</div>
+
 <div id="logoutConfirmOverlay">
     <div class="logout-confirm-box">
         <i class="fa-solid fa-right-from-bracket logout-confirm-icon"></i>
@@ -440,18 +522,6 @@ Add Student
         <div class="logout-confirm-actions">
             <button id="logoutCancelBtn" type="button">No</button>
             <button id="logoutYesBtn" type="button">Yes, log out</button>
-        </div>
-    </div>
-</div>
-
-<div id="deleteConfirmOverlay">
-    <div class="logout-confirm-box delete-confirm-box">
-        <i class="fa-solid fa-trash logout-confirm-icon delete-confirm-icon"></i>
-        <h3>Delete student?</h3>
-        <p>Are you sure you want to delete <strong id="deleteConfirmName"></strong>'s information? This cannot be undone.</p>
-        <div class="logout-confirm-actions">
-            <button id="deleteCancelBtn" type="button">Cancel</button>
-            <button id="deleteYesBtn" type="button">Yes, delete</button>
         </div>
     </div>
 </div>
