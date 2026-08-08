@@ -558,6 +558,7 @@ let workspaceOwnerUid = null;   // whose students/attendance data we're viewing
 let currentRole = "admin";      // 'admin' | 'staff' | 'viewer'
 let unsubscribeMembership = null;
 let workspaceResolveFailed = false; // true if resolveWorkspace() couldn't determine the real role
+let workspaceResolveErrorDetail = ""; // the actual Firebase error code/message, for on-screen display
 
 // So an admin can add someone by typing their email, every account gets
 // a small public-ish lookup entry (email -> uid) written on every login.
@@ -598,6 +599,7 @@ function resolveWorkspace(uid) {
             workspaceOwnerUid = uid;
             currentRole = "viewer";
             workspaceResolveFailed = true;
+            workspaceResolveErrorDetail = (err && err.code ? err.code : "unknown") + ": " + (err && err.message ? err.message : String(err));
         });
 }
 
@@ -990,11 +992,15 @@ function renderLoadError(err) {
         ? "Couldn't verify your account access. Please refresh the page — if this keeps happening, tell the app admin."
         : "Couldn't load your students. Check your connection and try again.";
 
+    const detail = err && err.code === "workspace-resolve-failed" && workspaceResolveErrorDetail
+        ? `<br><small style="opacity:0.8; word-break:break-word;">${workspaceResolveErrorDetail}</small>`
+        : "";
+
     table.innerHTML = `
         <tr>
             <td colspan="6" class="table-error">
                 <i class="fa-solid fa-triangle-exclamation"></i>
-                ${message}
+                ${message}${detail}
             </td>
         </tr>
     `;
