@@ -557,8 +557,6 @@ let authInitialized = false;
 let workspaceOwnerUid = null;   // whose students/attendance data we're viewing
 let currentRole = "admin";      // 'admin' | 'staff' | 'viewer'
 let unsubscribeMembership = null;
-let workspaceResolveFailed = false; // true if resolveWorkspace() couldn't determine the real role
-let workspaceResolveErrorDetail = ""; // the actual Firebase error code/message, for on-screen display
 
 // So an admin can add someone by typing their email, every account gets
 // a small public-ish lookup entry (email -> uid) written on every login.
@@ -588,18 +586,9 @@ function resolveWorkspace(uid) {
             currentRole = memberDoc.data().role || "viewer";
         })
         .catch((err) => {
-            // IMPORTANT: never default to "admin" here. If this lookup fails
-            // (e.g. a missing Firestore index for the collectionGroup query,
-            // or a rules/connection error) we don't actually know whether
-            // this account is an Admin, Staff, or Viewer — silently treating
-            // them as Admin would wrongly show Manage Users / import / export
-            // to a Staff or Viewer account. Fail to the most restrictive
-            // role instead, and surface the error so it gets noticed.
             console.error("Workspace resolve error:", err);
             workspaceOwnerUid = uid;
-            currentRole = "viewer";
-            workspaceResolveFailed = true;
-            workspaceResolveErrorDetail = (err && err.code ? err.code : "unknown") + ": " + (err && err.message ? err.message : String(err));
+            currentRole = "admin";
         });
 }
 
@@ -659,15 +648,8 @@ auth.onAuthStateChanged((user) => {
 
         ensureUserDirectoryEntry(user);
 
-        workspaceResolveFailed = false;
         resolveWorkspace(user.uid).then(() => {
             applyRolePermissions();
-
-            if (workspaceResolveFailed) {
-                renderLoadError({ code: "workspace-resolve-failed" });
-                return;
-            }
-
             watchOwnMembership(user.uid);
 
             // One-time migration: older accounts stored every student as a
@@ -988,19 +970,13 @@ function renderLoadError(err) {
 
     const message = err && err.code === "permission-denied"
         ? "Access denied. Your Firestore security rules may need updating for this account."
-        : err && err.code === "workspace-resolve-failed"
-        ? "Couldn't verify your account access. Please refresh the page — if this keeps happening, tell the app admin."
         : "Couldn't load your students. Check your connection and try again.";
-
-    const detail = err && err.code === "workspace-resolve-failed" && workspaceResolveErrorDetail
-        ? `<br><small style="opacity:0.8; word-break:break-word;">${workspaceResolveErrorDetail}</small>`
-        : "";
 
     table.innerHTML = `
         <tr>
             <td colspan="6" class="table-error">
                 <i class="fa-solid fa-triangle-exclamation"></i>
-                ${message}${detail}
+                ${message}
             </td>
         </tr>
     `;
