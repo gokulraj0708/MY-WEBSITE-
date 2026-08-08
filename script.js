@@ -1,4 +1,89 @@
 
+/* ================= ANIMATED ALERT / CONFIRM DIALOGS ================= */
+/* Drop-in, promise-based replacements for the native window.alert() and
+   window.confirm() browser popups, styled to match the app's own popups. */
+
+const customAlertOverlay = document.getElementById("customAlertOverlay");
+const customAlertIcon = document.getElementById("customAlertIcon");
+const customAlertTitle = document.getElementById("customAlertTitle");
+const customAlertMessage = document.getElementById("customAlertMessage");
+const customAlertOkBtn = document.getElementById("customAlertOkBtn");
+
+const customConfirmOverlay = document.getElementById("customConfirmOverlay");
+const customConfirmIcon = document.getElementById("customConfirmIcon");
+const customConfirmTitle = document.getElementById("customConfirmTitle");
+const customConfirmMessage = document.getElementById("customConfirmMessage");
+const customConfirmOkBtn = document.getElementById("customConfirmOkBtn");
+const customConfirmCancelBtn = document.getElementById("customConfirmCancelBtn");
+
+const DIALOG_ICONS = {
+    info: "fa-solid fa-circle-info",
+    success: "fa-solid fa-circle-check",
+    warning: "fa-solid fa-triangle-exclamation",
+    error: "fa-solid fa-circle-exclamation",
+    question: "fa-solid fa-circle-question"
+};
+
+const DIALOG_TITLES = {
+    info: "Notice",
+    success: "Success",
+    warning: "Heads up",
+    error: "Something went wrong",
+    question: "Please confirm"
+};
+
+// Replacement for window.alert(message). Returns a Promise that resolves
+// once the user dismisses the popup (usually safe to ignore/not await).
+function showAlert(message, type = "info", title) {
+    customAlertMessage.textContent = message;
+    customAlertTitle.textContent = title || DIALOG_TITLES[type] || DIALOG_TITLES.info;
+    customAlertIcon.className = `${DIALOG_ICONS[type] || DIALOG_ICONS.info} dialog-icon dialog-icon-${type}`;
+
+    customAlertOverlay.classList.add("active");
+
+    return new Promise((resolve) => {
+        function onClose() {
+            customAlertOverlay.classList.remove("active");
+            customAlertOkBtn.removeEventListener("click", onClose);
+            customAlertOverlay.removeEventListener("click", onOverlayClick);
+            resolve();
+        }
+        function onOverlayClick(e) {
+            if (e.target === customAlertOverlay) onClose();
+        }
+        customAlertOkBtn.addEventListener("click", onClose);
+        customAlertOverlay.addEventListener("click", onOverlayClick);
+    });
+}
+
+// Replacement for window.confirm(message). Returns a Promise<boolean> —
+// await it (e.g. `if (!(await showConfirm("..."))) return;`).
+function showConfirm(message, { okText = "Yes", cancelText = "Cancel", type = "question", title } = {}) {
+    customConfirmMessage.textContent = message;
+    customConfirmTitle.textContent = title || DIALOG_TITLES[type] || DIALOG_TITLES.question;
+    customConfirmIcon.className = `${DIALOG_ICONS[type] || DIALOG_ICONS.question} dialog-icon dialog-icon-${type}`;
+    customConfirmOkBtn.textContent = okText;
+    customConfirmCancelBtn.textContent = cancelText;
+
+    customConfirmOverlay.classList.add("active");
+
+    return new Promise((resolve) => {
+        function cleanup(result) {
+            customConfirmOverlay.classList.remove("active");
+            customConfirmOkBtn.removeEventListener("click", onOk);
+            customConfirmCancelBtn.removeEventListener("click", onCancel);
+            customConfirmOverlay.removeEventListener("click", onOverlayClick);
+            resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        function onOverlayClick(e) { if (e.target === customConfirmOverlay) cleanup(false); }
+
+        customConfirmOkBtn.addEventListener("click", onOk);
+        customConfirmCancelBtn.addEventListener("click", onCancel);
+        customConfirmOverlay.addEventListener("click", onOverlayClick);
+    });
+}
 
 const popup = document.getElementById("popup");
 const addBtn = document.getElementById("addBtn");
@@ -361,7 +446,7 @@ forgotPasswordLink.onclick = (e) => {
 
 const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 
-resetPasswordBtn.onclick = () => {
+resetPasswordBtn.onclick = async () => {
     teamMenu.classList.remove("show");
 
     if (!currentUser || !currentUser.email) return;
@@ -371,20 +456,21 @@ resetPasswordBtn.onclick = () => {
     );
 
     if (!usesPassword) {
-        alert("Your account signs in with Google, so there's no password to reset.");
+        showAlert("Your account signs in with Google, so there's no password to reset.", "info");
         return;
     }
 
-    if (!confirm(`Send a password reset link to ${currentUser.email}?`)) {
+    const confirmed = await showConfirm(`Send a password reset link to ${currentUser.email}?`, { okText: "Send" });
+    if (!confirmed) {
         return;
     }
 
     auth.sendPasswordResetEmail(currentUser.email)
         .then(() => {
-            alert(`Password reset link sent to ${currentUser.email}. If you don't get the mail, please check your Gmail spam/junk folder.`);
+            showAlert(`Password reset link sent to ${currentUser.email}. If you don't get the mail, please check your Gmail spam/junk folder.`, "success");
         })
         .catch((err) => {
-            alert(getFriendlyAuthError(err.code));
+            showAlert(getFriendlyAuthError(err.code), "error");
         });
 };
 
@@ -432,16 +518,17 @@ function renderMembersList(members) {
 function changeMemberRole(uid, newRole) {
     if (currentRole !== "admin") return;
     membersCollection().doc(uid).update({ role: newRole }).catch(() => {
-        alert("Could not update role. Please check your connection and try again.");
+        showAlert("Could not update role. Please check your connection and try again.", "error");
     });
 }
 
-function removeMember(uid) {
+async function removeMember(uid) {
     if (currentRole !== "admin") return;
-    if (!confirm("Remove this person's access?")) return;
+    const confirmed = await showConfirm("Remove this person's access?", { okText: "Remove", type: "warning" });
+    if (!confirmed) return;
 
     membersCollection().doc(uid).delete().catch(() => {
-        alert("Could not remove access. Please check your connection and try again.");
+        showAlert("Could not remove access. Please check your connection and try again.", "error");
     });
 }
 
@@ -848,12 +935,12 @@ saveBtn.onclick = () => {
         student.mobile === "" ||
         parentMobile === ""
     ) {
-        alert("Please fill all fields.");
+        showAlert("Please fill all fields.", "warning");
         return;
     }
 
     if (!/^\d{10}$/.test(student.mobile)) {
-        alert("Please enter a valid 10-digit mobile number.");
+        showAlert("Please enter a valid 10-digit mobile number.", "warning");
         return;
     }
 
@@ -862,27 +949,27 @@ saveBtn.onclick = () => {
     );
 
     if (duplicateMobile) {
-        alert("This mobile number is already registered.");
+        showAlert("This mobile number is already registered.", "warning");
         return;
     }
 
     if (regno !== "" && !/^\d{1,20}$/.test(regno)) {
-        alert("Reg. No. must contain only numbers (1 to 20 digits).");
+        showAlert("Reg. No. must contain only numbers (1 to 20 digits).", "warning");
         return;
     }
 
     if (email !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        alert("Please enter a valid email address.");
+        showAlert("Please enter a valid email address.", "warning");
         return;
     }
 
     if (!/^\d{10}$/.test(parentMobile)) {
-        alert("Please enter a valid 10-digit parent's mobile number.");
+        showAlert("Please enter a valid 10-digit parent's mobile number.", "warning");
         return;
     }
 
     if (parentMobile === student.mobile) {
-        alert("Parent's mobile number must be different from the student's mobile number.");
+        showAlert("Parent's mobile number must be different from the student's mobile number.", "warning");
         return;
     }
 
@@ -891,7 +978,7 @@ saveBtn.onclick = () => {
         : studentsCollection().doc(editId).update(student);
 
     savePromise.catch(() => {
-        alert("Could not save. Please check your connection and try again.");
+        showAlert("Could not save. Please check your connection and try again.", "error");
     });
 
     editId = null;
@@ -1181,14 +1268,16 @@ function editStudent(id){
 }
 
 
-function deleteStudent(id){
+async function deleteStudent(id){
 
     if (currentRole !== "admin") return;
 
-    if(confirm("Delete this student?")){
+    const confirmed = await showConfirm("Delete this student?", { okText: "Delete", type: "warning" });
+
+    if(confirmed){
 
         studentsCollection().doc(id).delete().catch(() => {
-            alert("Could not delete. Please check your connection and try again.");
+            showAlert("Could not delete. Please check your connection and try again.", "error");
         });
 
     }
@@ -2084,7 +2173,7 @@ if (exportDownloadBtn) {
     exportDownloadBtn.onclick = () => {
         const list = getFilteredExportList();
         if (list.length === 0) {
-            alert("No students to export for this selection.");
+            showAlert("No students to export for this selection.", "warning");
             return;
         }
         const deptLabel = buildExportScopeLabel();
@@ -2099,7 +2188,7 @@ if (exportShareBtn) {
     exportShareBtn.onclick = async () => {
         const list = getFilteredExportList();
         if (list.length === 0) {
-            alert("No students to export for this selection.");
+            showAlert("No students to export for this selection.", "warning");
             return;
         }
         const deptLabel = buildExportScopeLabel();
@@ -2118,11 +2207,11 @@ if (exportShareBtn) {
                 });
             } catch (err) {
                 if (err.name !== "AbortError") {
-                    alert("Couldn't share the file. Try Download instead.");
+                    showAlert("Couldn't share the file. Try Download instead.", "error");
                 }
             }
         } else {
-            alert("Sharing isn't supported on this device/browser. Use Download instead, then share the PDF yourself.");
+            showAlert("Sharing isn't supported on this device/browser. Use Download instead, then share the PDF yourself.", "warning");
             return;
         }
 
@@ -2241,7 +2330,7 @@ if (importFileInput) {
         if (!file) return;
 
         if (!currentUser) {
-            alert("Please log in first.");
+            showAlert("Please log in first.", "warning");
             return;
         }
 
@@ -2251,12 +2340,12 @@ if (importFileInput) {
             const importedStudents = parseEmbeddedStudentData(fullText);
 
             if (!importedStudents) {
-                alert("This PDF doesn't contain importable student data. Make sure it was exported from this app's Export button.");
+                showAlert("This PDF doesn't contain importable student data. Make sure it was exported from this app's Export button.", "error");
                 return;
             }
 
             if (importedStudents.length === 0) {
-                alert("This file has no students to import.");
+                showAlert("This file has no students to import.", "warning");
                 return;
             }
 
@@ -2265,11 +2354,11 @@ if (importFileInput) {
             let message = `Imported ${added} student${added === 1 ? "" : "s"}.`;
             if (skipped > 0) message += ` Skipped ${skipped} already in your list.`;
             if (invalid > 0) message += ` ${invalid} had invalid data and were skipped.`;
-            alert(message);
+            showAlert(message, "success");
 
         } catch (err) {
             console.error("Import error:", err);
-            alert("Couldn't read that PDF. Please make sure it's a valid file exported from this app.");
+            showAlert("Couldn't read that PDF. Please make sure it's a valid file exported from this app.", "error");
         } finally {
             importFileInput.value = "";
         }
@@ -2448,14 +2537,14 @@ attendanceSaveBtn.onclick = async () => {
     const dateStr = attendanceDateInput.value;
 
     if (!dateStr) {
-        alert("Please pick a date.");
+        showAlert("Please pick a date.", "warning");
         return;
     }
 
     const list = getAttendanceFilteredStudents();
 
     if (list.length === 0) {
-        alert("No students to save attendance for.");
+        showAlert("No students to save attendance for.", "warning");
         return;
     }
 
@@ -2487,7 +2576,7 @@ attendanceSaveBtn.onclick = async () => {
 
     } catch (err) {
         console.error("Attendance save error:", err);
-        alert("Couldn't save attendance. Please check your connection and try again.");
+        showAlert("Couldn't save attendance. Please check your connection and try again.", "error");
     } finally {
         attendanceSaveBtn.disabled = false;
         attendanceSaveBtn.innerHTML = originalLabel;
@@ -2562,7 +2651,7 @@ document.getElementById("copyAttendanceRecordBtn").onclick = function () {
         btn.innerHTML = `<i class="fa-solid fa-check"></i> Copied`;
         setTimeout(() => { btn.innerHTML = original; }, 1500);
     }).catch(() => {
-        alert("Could not copy. Please select and copy the text manually.");
+        showAlert("Could not copy. Please select and copy the text manually.", "error");
     });
 };
 
@@ -2712,7 +2801,7 @@ async function runAttendanceExport(action) {
     const list = getFilteredExportList();
 
     if (list.length === 0) {
-        alert("No students to export for this selection.");
+        showAlert("No students to export for this selection.", "warning");
         return;
     }
 
@@ -2720,14 +2809,14 @@ async function runAttendanceExport(action) {
     const toStr = exportAttendanceToDate.value || fromStr;
 
     if (toStr < fromStr) {
-        alert("The 'To' date can't be earlier than the 'From' date.");
+        showAlert("The 'To' date can't be earlier than the 'From' date.", "warning");
         return;
     }
 
     const dateList = getDateRange(fromStr, toStr);
 
     if (dateList.length === 0) {
-        alert("Please pick a valid date range.");
+        showAlert("Please pick a valid date range.", "warning");
         return;
     }
 
@@ -2756,13 +2845,13 @@ async function runAttendanceExport(action) {
             });
             exportPopup.classList.remove("active");
         } else {
-            alert("Sharing isn't supported on this device/browser. Use Download instead.");
+            showAlert("Sharing isn't supported on this device/browser. Use Download instead.", "warning");
         }
 
     } catch (err) {
         if (err.name === "AbortError") return;
         console.error("Attendance export error:", err);
-        alert("Couldn't generate the attendance report. Please check your connection and try again.");
+        showAlert("Couldn't generate the attendance report. Please check your connection and try again.", "error");
     }
 }
 

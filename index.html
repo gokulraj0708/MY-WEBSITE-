@@ -526,6 +526,31 @@ Add Student
     </div>
 </div>
 
+<!-- Animated replacement for native alert() popups -->
+<div id="customAlertOverlay" class="dialog-overlay">
+    <div class="dialog-box">
+        <i id="customAlertIcon" class="fa-solid fa-circle-info dialog-icon dialog-icon-info"></i>
+        <h3 id="customAlertTitle">Notice</h3>
+        <p id="customAlertMessage"></p>
+        <div class="dialog-actions">
+            <button id="customAlertOkBtn" type="button">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Animated replacement for native confirm() popups -->
+<div id="customConfirmOverlay" class="dialog-overlay">
+    <div class="dialog-box">
+        <i id="customConfirmIcon" class="fa-solid fa-circle-question dialog-icon dialog-icon-question"></i>
+        <h3 id="customConfirmTitle">Please confirm</h3>
+        <p id="customConfirmMessage"></p>
+        <div class="dialog-actions">
+            <button id="customConfirmCancelBtn" type="button">Cancel</button>
+            <button id="customConfirmOkBtn" type="button">Yes</button>
+        </div>
+    </div>
+</div>
+
 </div> <!-- /#appContent -->
 
 <script>
