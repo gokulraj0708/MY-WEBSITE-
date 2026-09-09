@@ -1,5 +1,5 @@
 // Service worker: required for the browser to consider this app installable.
-// This app needs Firebase/internet to actually work, so we only cache the
+// This app needs Supabase/internet to actually work, so we only cache the
 // app "shell" (the static files), not any data. That's enough to satisfy
 // install criteria and make the app open instantly instead of showing a
 // blank white screen while the network connects.
@@ -38,7 +38,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
 
   // Only handle GET requests for same-origin shell files.
-  // Everything else (Firebase, fonts, Font Awesome, etc.) goes straight
+  // Everything else (Supabase, fonts, Font Awesome, etc.) goes straight
   // to the network as normal — we never cache user data.
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) {
     return;

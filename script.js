@@ -269,7 +269,7 @@ let students = [];
 let currentVisibleList = students;
 let editId = null;
 let currentUser = null;
-let unsubscribeStudents = null; // Firestore real-time listener
+let studentsChannel = null; // Supabase real-time channel
 
 // Current table filter state. `currentFilter` tracks the search/degree
 // filter (from the search box or a dashboard drill-down), while
@@ -373,7 +373,7 @@ authSwitchLink.onclick = (e) => {
     }
 };
 
-authSubmitBtn.onclick = () => {
+authSubmitBtn.onclick = async () => {
     const email = authEmail.value.trim();
     const password = authPassword.value;
 
@@ -384,43 +384,68 @@ authSubmitBtn.onclick = () => {
 
     authError.textContent = "";
     authInfo.textContent = "";
+    authSubmitBtn.disabled = true;
 
-    const action = isSignupMode
-        ? auth.createUserWithEmailAndPassword(email, password)
-        : auth.signInWithEmailAndPassword(email, password);
-
-    action.catch((err) => {
-        authError.textContent = getFriendlyAuthError(err.code);
-    });
+    try {
+        if (isSignupMode) {
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if (error) throw error;
+            // If email confirmation is ON in Supabase, there is no session yet —
+            // tell them to verify, then switch back to login mode.
+            if (data.user && !data.session) {
+                authInfo.textContent = `Account created for ${email}. Check your inbox to confirm your email, then log in.`;
+                isSignupMode = false;
+                authTitle.textContent = "Login to continue";
+                authSubmitBtn.textContent = "Login";
+                authSwitchText.textContent = "Don't have an account?";
+                authSwitchLink.textContent = "Sign up";
+                authPassword.value = "";
+            }
+            // Otherwise onAuthStateChange fires and the app opens automatically.
+        } else {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+        }
+    } catch (err) {
+        authError.textContent = getFriendlyAuthError(err);
+    } finally {
+        authSubmitBtn.disabled = false;
+    }
 };
 
-function getFriendlyAuthError(code) {
-    switch (code) {
-        case "auth/invalid-credential":
-        case "auth/user-not-found":
-        case "auth/wrong-password":
-            return isSignupMode
-                ? "Something went wrong. Please try again."
-                : "No account found with that email and password. New here? Tap 'Sign up' below.";
-        case "auth/email-already-in-use":
-            return "An account with this email already exists. Please login instead.";
-        case "auth/invalid-email":
-            return "Please enter a valid email address.";
-        case "auth/weak-password":
-            return "Password should be at least 6 characters.";
-        case "auth/too-many-requests":
-            return "Too many attempts. Please wait a moment and try again.";
-        case "auth/network-request-failed":
-            return "Network error. Check your internet connection and try again.";
-        default:
-            return "Something went wrong. Please try again.";
+function getFriendlyAuthError(err) {
+    const msg = (err && err.message ? err.message : String(err || "")).toLowerCase();
+
+    if (msg.includes("invalid login credentials") || msg.includes("invalid_grant") || msg.includes("user not found")) {
+        return isSignupMode
+            ? "Something went wrong. Please try again."
+            : "No account found with that email and password. New here? Tap 'Sign up' below.";
     }
+    if (msg.includes("already registered") || msg.includes("already exists") || msg.includes("user already registered")) {
+        return "An account with this email already exists. Please login instead.";
+    }
+    if (msg.includes("invalid") && msg.includes("email")) {
+        return "Please enter a valid email address.";
+    }
+    if (msg.includes("password") && (msg.includes("6") || msg.includes("short") || msg.includes("weak") || msg.includes("least"))) {
+        return "Password should be at least 6 characters.";
+    }
+    if (msg.includes("email not confirmed") || msg.includes("not confirmed")) {
+        return "Please confirm your email first — check your inbox for the confirmation link, then log in.";
+    }
+    if (msg.includes("too many") || msg.includes("rate limit") || msg.includes("over request")) {
+        return "Too many attempts. Please wait a moment and try again.";
+    }
+    if (msg.includes("network") || msg.includes("fetch") || msg.includes("failed to fetch")) {
+        return "Network error. Check your internet connection and try again.";
+    }
+    return (err && err.message) || "Something went wrong. Please try again.";
 }
 
 const forgotPasswordLink = document.getElementById("forgotPasswordLink");
 const authInfo = document.getElementById("authInfo");
 
-forgotPasswordLink.onclick = (e) => {
+forgotPasswordLink.onclick = async (e) => {
     e.preventDefault();
     authError.textContent = "";
     authInfo.textContent = "";
@@ -433,29 +458,35 @@ forgotPasswordLink.onclick = (e) => {
         return;
     }
 
-    auth.sendPasswordResetEmail(email)
-        .then(() => {
-            authInfo.textContent = `Password reset link sent to ${email}. Check your inbox. If you don't see it, please check your Gmail spam/junk folder.`;
-        })
-        .catch((err) => {
-            authError.textContent = err.code === "auth/user-not-found"
-                ? "No account found with that email."
-                : getFriendlyAuthError(err.code);
+    try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.href,
         });
+        if (error) throw error;
+        authInfo.textContent = `If an account exists for ${email}, a password reset link was sent. Check your inbox (and spam/junk folder).`;
+    } catch (err) {
+        authError.textContent = getFriendlyAuthError(err);
+    }
 };
 
 const resetPasswordBtn = document.getElementById("resetPasswordBtn");
+
+function usesPasswordAuth(user) {
+    if (!user) return false;
+    // Email+password accounts have provider 'email'; Google OAuth has 'google'.
+    if (user.app_metadata && user.app_metadata.provider === "email") return true;
+    if (Array.isArray(user.identities)) {
+        return user.identities.some((i) => i.provider === "email" || i.provider === "password");
+    }
+    return true; // assume password if we can't tell
+}
 
 resetPasswordBtn.onclick = async () => {
     teamMenu.classList.remove("show");
 
     if (!currentUser || !currentUser.email) return;
 
-    const usesPassword = currentUser.providerData.some(
-        (p) => p.providerId === "password"
-    );
-
-    if (!usesPassword) {
+    if (!usesPasswordAuth(currentUser)) {
         showAlert("Your account signs in with Google, so there's no password to reset.", "info");
         return;
     }
@@ -465,13 +496,15 @@ resetPasswordBtn.onclick = async () => {
         return;
     }
 
-    auth.sendPasswordResetEmail(currentUser.email)
-        .then(() => {
-            showAlert(`Password reset link sent to ${currentUser.email}. If you don't get the mail, please check your Gmail spam/junk folder.`, "success");
-        })
-        .catch((err) => {
-            showAlert(getFriendlyAuthError(err.code), "error");
+    try {
+        const { error } = await supabase.auth.resetPasswordForEmail(currentUser.email, {
+            redirectTo: window.location.href,
         });
+        if (error) throw error;
+        showAlert(`Password reset link sent to ${currentUser.email}. If you don't get the mail, please check your Gmail spam/junk folder.`, "success");
+    } catch (err) {
+        showAlert(getFriendlyAuthError(err), "error");
+    }
 };
 
 /* ================= MANAGE USERS (roles) ================= */
@@ -484,7 +517,7 @@ const addMemberRole = document.getElementById("addMemberRole");
 const addMemberBtn = document.getElementById("addMemberBtn");
 const addMemberError = document.getElementById("addMemberError");
 
-let unsubscribeMembers = null;
+let membersChannel = null;
 
 function roleLabel(role) {
     if (role === "staff") return "Staff";
@@ -515,11 +548,20 @@ function renderMembersList(members) {
     `).join("");
 }
 
-function changeMemberRole(uid, newRole) {
+async function changeMemberRole(uid, newRole) {
     if (currentRole !== "admin") return;
-    membersCollection().doc(uid).update({ role: newRole }).catch(() => {
+    try {
+        const { error } = await supabase
+            .from("members")
+            .update({ role: newRole })
+            .eq("owner_id", workspaceOwnerUid)
+            .eq("uid", uid);
+        if (error) throw error;
+        await loadMembersList();
+    } catch (err) {
+        console.error(err);
         showAlert("Could not update role. Please check your connection and try again.", "error");
-    });
+    }
 }
 
 async function removeMember(uid) {
@@ -527,9 +569,51 @@ async function removeMember(uid) {
     const confirmed = await showConfirm("Remove this person's access?", { okText: "Remove", type: "warning" });
     if (!confirmed) return;
 
-    membersCollection().doc(uid).delete().catch(() => {
+    try {
+        const { error } = await supabase
+            .from("members")
+            .delete()
+            .eq("owner_id", workspaceOwnerUid)
+            .eq("uid", uid);
+        if (error) throw error;
+        await loadMembersList();
+    } catch (err) {
+        console.error(err);
         showAlert("Could not remove access. Please check your connection and try again.", "error");
-    });
+    }
+}
+
+async function loadMembersList() {
+    try {
+        const { data, error } = await supabase
+            .from("members")
+            .select("*")
+            .eq("owner_id", workspaceOwnerUid)
+            .order("added_at", { ascending: true });
+        if (error) throw error;
+        renderMembersList(data || []);
+    } catch (err) {
+        console.error(err);
+        membersListContent.innerHTML = `<p class="members-empty">Could not load users.</p>`;
+    }
+}
+
+function subscribeMembers() {
+    if (membersChannel) {
+        supabase.removeChannel(membersChannel);
+        membersChannel = null;
+    }
+    membersChannel = supabase
+        .channel(`members-${workspaceOwnerUid}`)
+        .on("postgres_changes", {
+            event: "*",
+            schema: "public",
+            table: "members",
+            filter: `owner_id=eq.${workspaceOwnerUid}`,
+        }, () => {
+            loadMembersList();
+        })
+        .subscribe();
 }
 
 if (manageUsersBtn) {
@@ -541,13 +625,8 @@ if (manageUsersBtn) {
         addMemberError.textContent = "";
         membersListContent.innerHTML = `<p class="members-empty">Loading...</p>`;
 
-        if (unsubscribeMembers) unsubscribeMembers();
-        unsubscribeMembers = membersCollection().onSnapshot((snap) => {
-            const members = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
-            renderMembersList(members);
-        }, () => {
-            membersListContent.innerHTML = `<p class="members-empty">Could not load users.</p>`;
-        });
+        loadMembersList();
+        subscribeMembers();
 
         manageUsersPopup.classList.add("active");
     };
@@ -555,13 +634,13 @@ if (manageUsersBtn) {
 
 document.getElementById("closeManageUsers").onclick = function () {
     manageUsersPopup.classList.remove("active");
-    if (unsubscribeMembers) {
-        unsubscribeMembers();
-        unsubscribeMembers = null;
+    if (membersChannel) {
+        supabase.removeChannel(membersChannel);
+        membersChannel = null;
     }
 };
 
-addMemberBtn.onclick = () => {
+addMemberBtn.onclick = async () => {
     if (currentRole !== "admin") return;
 
     const email = addMemberEmail.value.trim().toLowerCase();
@@ -581,34 +660,42 @@ addMemberBtn.onclick = () => {
     addMemberBtn.disabled = true;
     addMemberBtn.textContent = "Adding...";
 
-    db.collection("users").where("email", "==", email).limit(1).get()
-        .then((snap) => {
-            if (snap.empty) {
-                addMemberError.textContent = "No account with that email yet. Ask them to sign up first, then add them.";
-                return;
-            }
+    try {
+        const { data, error } = await supabase
+            .from("users")
+            .select("id, name")
+            .ilike("email", email)
+            .limit(1)
+            .maybeSingle();
 
-            const foundUid = snap.docs[0].id;
-            const foundName = snap.docs[0].data().name || "";
+        if (error) throw error;
 
-            return membersCollection().doc(foundUid).set({
-                uid: foundUid,
+        if (!data) {
+            addMemberError.textContent = "No account with that email yet. Ask them to sign up first, then add them.";
+            return;
+        }
+
+        const { error: upsertError } = await supabase
+            .from("members")
+            .upsert({
+                owner_id: workspaceOwnerUid,
+                uid: data.id,
                 email: email,
-                name: foundName,
+                name: data.name || "",
                 role: role,
-                addedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            }).then(() => {
-                addMemberEmail.value = "";
-            });
-        })
-        .catch((err) => {
-            addMemberError.textContent = "Something went wrong. Please try again.";
-            console.error(err);
-        })
-        .finally(() => {
-            addMemberBtn.disabled = false;
-            addMemberBtn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Add`;
-        });
+            }, { onConflict: "owner_id,uid" });
+
+        if (upsertError) throw upsertError;
+
+        addMemberEmail.value = "";
+        await loadMembersList();
+    } catch (err) {
+        addMemberError.textContent = "Something went wrong. Please try again.";
+        console.error(err);
+    } finally {
+        addMemberBtn.disabled = false;
+        addMemberBtn.innerHTML = `<i class="fa-solid fa-user-plus"></i> Add`;
+    }
 };
 
 logoutBtn.onclick = () => {
@@ -620,21 +707,25 @@ logoutCancelBtn.onclick = () => {
     logoutConfirmOverlay.classList.remove("active");
 };
 
-logoutYesBtn.onclick = () => {
+logoutYesBtn.onclick = async () => {
     logoutConfirmOverlay.classList.remove("active");
-    auth.signOut();
+    await supabase.auth.signOut();
 };
 
 const googleSignInBtn = document.getElementById("googleSignInBtn");
-const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-googleSignInBtn.onclick = () => {
+googleSignInBtn.onclick = async () => {
     authError.textContent = "";
-    auth.signInWithPopup(googleProvider).catch((err) => {
-        if (err.code !== "auth/popup-closed-by-user") {
-            authError.textContent = getFriendlyAuthError(err.code);
-        }
-    });
+    authInfo.textContent = "";
+    try {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: window.location.href },
+        });
+        if (error) throw error;
+    } catch (err) {
+        authError.textContent = getFriendlyAuthError(err);
+    }
 };
 
 // This runs automatically whenever login state changes,
@@ -643,79 +734,175 @@ let authInitialized = false;
 
 let workspaceOwnerUid = null;   // whose students/attendance data we're viewing
 let currentRole = "admin";      // 'admin' | 'staff' | 'viewer'
-let unsubscribeMembership = null;
+let membershipChannel = null;
+
+// ---- Supabase row <-> app object mapping ----
+// DB uses snake_case (parent_mobile, owner_id); the app uses camelCase
+// (parentMobile). These two helpers translate at the boundary so the
+// rest of the app code never has to care about column names.
+function rowToStudent(row) {
+    return {
+        id: row.id,
+        name: row.name,
+        dept: row.dept,
+        year: row.year || "",
+        regno: row.regno || "",
+        mobile: row.mobile,
+        email: row.email || "",
+        parentMobile: row.parent_mobile || "",
+        address: row.address || "",
+        gender: row.gender,
+    };
+}
+
+function studentToRow(student, ownerId) {
+    return {
+        owner_id: ownerId,
+        name: student.name,
+        dept: student.dept,
+        year: student.year || "",
+        regno: student.regno || "",
+        mobile: student.mobile,
+        email: student.email || "",
+        parent_mobile: student.parentMobile || "",
+        address: student.address || "",
+        gender: student.gender,
+    };
+}
 
 // So an admin can add someone by typing their email, every account gets
 // a small public-ish lookup entry (email -> uid) written on every login.
-function ensureUserDirectoryEntry(user) {
+async function ensureUserDirectoryEntry(user) {
     if (!user || !user.email) return;
-    db.collection("users").doc(user.uid).set({
-        email: user.email,
-        name: getUserDisplayName(user),
-    }, { merge: true }).catch(() => {});
+    try {
+        await supabase.from("users").upsert({
+            id: user.id,
+            email: user.email,
+            name: getUserDisplayName(user),
+        }, { onConflict: "id" });
+    } catch (err) {
+        console.warn("Directory entry error:", err);
+    }
 }
 
 // Figures out which workspace this login should see: their own (they're
 // the Admin) or someone else's, if an admin has added them as Staff/Viewer.
-function resolveWorkspace(uid) {
-    return db.collectionGroup("members")
-        .where("uid", "==", uid)
-        .limit(1)
-        .get()
-        .then((snap) => {
-            if (snap.empty) {
-                workspaceOwnerUid = uid;
-                currentRole = "admin";
-                return;
-            }
-            const memberDoc = snap.docs[0];
-            workspaceOwnerUid = memberDoc.ref.parent.parent.id;
-            currentRole = memberDoc.data().role || "viewer";
-        })
-        .catch((err) => {
-            console.error("Workspace resolve error:", err);
+async function resolveWorkspace(uid) {
+    try {
+        const { data, error } = await supabase
+            .from("members")
+            .select("owner_id, role")
+            .eq("uid", uid)
+            .limit(1)
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) {
             workspaceOwnerUid = uid;
             currentRole = "admin";
-        });
+        } else {
+            workspaceOwnerUid = data.owner_id;
+            currentRole = data.role || "viewer";
+        }
+    } catch (err) {
+        console.error("Workspace resolve error:", err);
+        workspaceOwnerUid = uid;
+        currentRole = "admin";
+    }
 }
 
 function watchOwnMembership(uid) {
-    if (unsubscribeMembership) {
-        unsubscribeMembership();
-        unsubscribeMembership = null;
+    if (membershipChannel) {
+        supabase.removeChannel(membershipChannel);
+        membershipChannel = null;
     }
 
     if (workspaceOwnerUid === uid) return; // owner/admin of own data, nothing to watch
 
-    unsubscribeMembership = db.collection("students")
-        .doc(workspaceOwnerUid)
-        .collection("members")
-        .doc(uid)
-        .onSnapshot((doc) => {
-            if (!doc.exists) {
-                // Access was removed — send them back to their own (empty) workspace.
+    membershipChannel = supabase
+        .channel(`membership-${uid}`)
+        .on("postgres_changes", {
+            event: "*",
+            schema: "public",
+            table: "members",
+            filter: `uid=eq.${uid}`,
+        }, (payload) => {
+            if (payload.eventType === "DELETE") {
+                const oldRow = payload.old || {};
+                if (oldRow.owner_id && oldRow.owner_id !== workspaceOwnerUid) return;
+                // Access was removed — send them back to their own workspace.
                 location.reload();
                 return;
             }
-            currentRole = doc.data().role || "viewer";
+            const row = payload.new || {};
+            if (row.owner_id && row.owner_id !== workspaceOwnerUid) return;
+            currentRole = row.role || "viewer";
             applyRolePermissions();
             renderStudents();
-        });
+        })
+        .subscribe();
 }
 
-auth.onAuthStateChanged((user) => {
+// ---- Students data (fetch + realtime) ----
+
+async function fetchStudents() {
+    const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("owner_id", workspaceOwnerUid)
+        .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data || []).map(rowToStudent);
+}
+
+async function reloadStudents() {
+    try {
+        students = await fetchStudents();
+        refreshTableFilterOptions();
+        applyFilters();
+    } catch (err) {
+        console.error("Sync error:", err);
+        renderLoadError(err);
+    }
+}
+
+function subscribeStudents() {
+    if (studentsChannel) {
+        supabase.removeChannel(studentsChannel);
+        studentsChannel = null;
+    }
+    studentsChannel = supabase
+        .channel(`students-${workspaceOwnerUid}`)
+        .on("postgres_changes", {
+            event: "*",
+            schema: "public",
+            table: "students",
+            filter: `owner_id=eq.${workspaceOwnerUid}`,
+        }, () => {
+            reloadStudents();
+        })
+        .subscribe();
+}
+
+function cleanupRealtime() {
+    if (studentsChannel) {
+        supabase.removeChannel(studentsChannel);
+        studentsChannel = null;
+    }
+    if (membershipChannel) {
+        supabase.removeChannel(membershipChannel);
+        membershipChannel = null;
+    }
+    if (membersChannel) {
+        supabase.removeChannel(membersChannel);
+        membersChannel = null;
+    }
+}
+
+async function handleAuthUser(user) {
     const wasLoggedOut = !currentUser;
     currentUser = user;
 
-    if (unsubscribeStudents) {
-        unsubscribeStudents();
-        unsubscribeStudents = null;
-    }
-    if (unsubscribeMembership) {
-        unsubscribeMembership();
-        unsubscribeMembership = null;
-    }
-
+    cleanupRealtime();
     updateCurrentUserDisplay(user);
 
     if (user) {
@@ -730,40 +917,18 @@ auth.onAuthStateChanged((user) => {
             showLoginWelcome(user);
         }
 
-        // Show placeholders while Firestore fetches this user's data.
+        // Show placeholders while Supabase fetches this user's data.
         renderSkeleton();
 
-        ensureUserDirectoryEntry(user);
+        await ensureUserDirectoryEntry(user);
+        await resolveWorkspace(user.id);
+        applyRolePermissions();
+        watchOwnMembership(user.id);
 
-        resolveWorkspace(user.uid).then(() => {
-            applyRolePermissions();
-            watchOwnMembership(user.uid);
-
-            // One-time migration: older accounts stored every student as a
-            // single array field. Only run this for the actual data owner —
-            // never for someone viewing another admin's workspace.
-            const migration = workspaceOwnerUid === user.uid
-                ? migrateOldStudentsIfNeeded(user.uid)
-                : Promise.resolve();
-
-            migration.finally(() => {
-
-                // Real-time listener: keeps this workspace's data in sync
-                // across every device/member, live, no manual refresh needed.
-                unsubscribeStudents = db.collection("students")
-                    .doc(workspaceOwnerUid)
-                    .collection("list")
-                    .onSnapshot((snapshot) => {
-                        students = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-                        refreshTableFilterOptions();
-                        applyFilters();
-                    }, (err) => {
-                        console.error("Sync error:", err);
-                        renderLoadError(err);
-                    });
-
-            });
-        });
+        // Initial load + real-time listener: keeps this workspace's data
+        // in sync across every device/member, live, no manual refresh needed.
+        await reloadStudents();
+        subscribeStudents();
     } else {
         appContent.style.display = "none";
         authScreen.style.display = "flex";
@@ -774,9 +939,9 @@ auth.onAuthStateChanged((user) => {
         selectedDegree = "";
         selectedYear = "";
         currentFilter = { type: "all", value: "" };
-        if (filterDepartmentSelect) filterDepartmentSelect.innerHTML = `<option value="">All Departments</option>`;
-        if (filterDegreeSelect) filterDegreeSelect.innerHTML = `<option value="">All Degrees</option>`;
-        if (filterYearSelect) filterYearSelect.value = "";
+        if (typeof filterDepartmentSelect !== "undefined" && filterDepartmentSelect) filterDepartmentSelect.innerHTML = `<option value="">All Departments</option>`;
+        if (typeof filterDegreeSelect !== "undefined" && filterDegreeSelect) filterDegreeSelect.innerHTML = `<option value="">All Degrees</option>`;
+        if (typeof filterYearSelect !== "undefined" && filterYearSelect) filterYearSelect.value = "";
         if (search) search.value = "";
         renderStudents();
     }
@@ -790,6 +955,10 @@ auth.onAuthStateChanged((user) => {
     }
 
     authInitialized = true;
+}
+
+supabase.auth.onAuthStateChange((_event, session) => {
+    handleAuthUser(session && session.user ? session.user : null);
 });
 
 // Shows/hides everything that depends on the current user's role. Called
@@ -818,7 +987,9 @@ function applyRolePermissions() {
 
 function getUserDisplayName(user) {
     if (!user) return "User";
-    return user.displayName || (user.email ? user.email.split("@")[0] : "User");
+    const meta = user.user_metadata || {};
+    return meta.full_name || meta.name || meta.display_name
+        || (user.email ? user.email.split("@")[0] : "User");
 }
 
 function updateCurrentUserDisplay(user) {
@@ -843,41 +1014,38 @@ document.getElementById("closeLoginWelcome").onclick = function () {
     document.getElementById("loginWelcomePopup").classList.remove("active");
 };
 
-function migrateOldStudentsIfNeeded(uid) {
-    const oldDocRef = db.collection("students").doc(uid);
-    const listRef = oldDocRef.collection("list");
+// ---- Student CRUD (Supabase) ----
+// NOTE: the old Firebase one-time migration (array-field -> subcollection)
+// is intentionally gone — Supabase starts fresh with real tables.
 
-    return oldDocRef.get().then((oldDoc) => {
-        if (!oldDoc.exists) return;
-
-        const oldList = oldDoc.data().list;
-        if (!Array.isArray(oldList) || oldList.length === 0) return;
-
-        // Only migrate if the new subcollection is still empty, so this
-        // never runs twice or duplicates anyone's students.
-        return listRef.limit(1).get().then((existing) => {
-            if (!existing.empty) return;
-
-            const batch = db.batch();
-            oldList.forEach((student) => {
-                batch.set(listRef.doc(), student);
-            });
-
-            return batch.commit().then(() =>
-                oldDocRef.update({ list: firebase.firestore.FieldValue.delete() })
-            );
-        });
-    }).catch((err) => {
-        console.error("Migration error:", err);
-    });
+async function createStudentRow(student) {
+    const { error } = await supabase
+        .from("students")
+        .insert(studentToRow(student, workspaceOwnerUid));
+    if (error) throw error;
+    await reloadStudents();
 }
 
-function studentsCollection() {
-    return db.collection("students").doc(workspaceOwnerUid).collection("list");
+async function updateStudentRow(id, student) {
+    const row = studentToRow(student, workspaceOwnerUid);
+    delete row.owner_id; // never move a student to another workspace
+    const { error } = await supabase
+        .from("students")
+        .update(row)
+        .eq("id", id)
+        .eq("owner_id", workspaceOwnerUid);
+    if (error) throw error;
+    await reloadStudents();
 }
 
-function membersCollection() {
-    return db.collection("students").doc(workspaceOwnerUid).collection("members");
+async function deleteStudentRow(id) {
+    const { error } = await supabase
+        .from("students")
+        .delete()
+        .eq("id", id)
+        .eq("owner_id", workspaceOwnerUid);
+    if (error) throw error;
+    await reloadStudents();
 }
 
 
@@ -900,7 +1068,7 @@ closeBtn.onclick = () => {
 };
 
 
-saveBtn.onclick = () => {
+saveBtn.onclick = async () => {
 
     let dept = "";
     if (deptInput.value === "Others") {
@@ -973,13 +1141,25 @@ saveBtn.onclick = () => {
         return;
     }
 
-    const savePromise = editId === null
-        ? studentsCollection().add(student)
-        : studentsCollection().doc(editId).update(student);
-
-    savePromise.catch(() => {
-        showAlert("Could not save. Please check your connection and try again.", "error");
-    });
+    const savingId = editId;
+    saveBtn.disabled = true;
+    try {
+        if (savingId === null) {
+            await createStudentRow(student);
+        } else {
+            await updateStudentRow(savingId, student);
+        }
+    } catch (err) {
+        console.error("Save error:", err);
+        if (err && (err.code === "23505" || (err.message && err.message.toLowerCase().includes("duplicate")))) {
+            showAlert("This mobile number is already registered.", "warning");
+        } else {
+            showAlert("Could not save. Please check your connection and try again.", "error");
+        }
+        saveBtn.disabled = false;
+        return;
+    }
+    saveBtn.disabled = false;
 
     editId = null;
 
@@ -1055,8 +1235,8 @@ function renderSkeleton(rows = 4) {
 
 function renderLoadError(err) {
 
-    const message = err && err.code === "permission-denied"
-        ? "Access denied. Your Firestore security rules may need updating for this account."
+    const message = err && (err.code === "42501" || (err.message && err.message.toLowerCase().includes("policy")))
+        ? "Access denied. Your Supabase security policies may need updating for this account (did you run supabase-schema.sql?)."
         : "Couldn't load your students. Check your connection and try again.";
 
     table.innerHTML = `
@@ -1276,9 +1456,12 @@ async function deleteStudent(id){
 
     if(confirmed){
 
-        studentsCollection().doc(id).delete().catch(() => {
+        try {
+            await deleteStudentRow(id);
+        } catch (err) {
+            console.error("Delete error:", err);
             showAlert("Could not delete. Please check your connection and try again.", "error");
-        });
+        }
 
     }
 
@@ -1761,8 +1944,8 @@ function dateStrToDate(dateStr) {
 }
 
 // Every date string from fromStr to toStr (inclusive), both ends included.
-// Capped at 62 days so a huge accidental range can't trigger hundreds of
-// Firestore reads at once.
+// Capped at 62 days so a huge accidental range can't trigger a giant
+// Supabase query at once.
 const MAX_ATTENDANCE_RANGE_DAYS = 62;
 
 function getDateRange(fromStr, toStr) {
@@ -2289,6 +2472,8 @@ async function importStudentsFromList(importedStudents) {
     let skipped = 0;
     let invalid = 0;
 
+    const rowsToInsert = [];
+
     for (const raw of importedStudents) {
         const student = {
             name: (raw.name || "").trim(),
@@ -2312,14 +2497,34 @@ async function importStudentsFromList(importedStudents) {
             continue;
         }
 
+        existingMobiles.add(student.mobile);
+        rowsToInsert.push(studentToRow(student, workspaceOwnerUid));
+    }
+
+    // Insert in one batch (chunked to stay safe with large imports).
+    const CHUNK = 100;
+    for (let i = 0; i < rowsToInsert.length; i += CHUNK) {
+        const chunk = rowsToInsert.slice(i, i + CHUNK);
         try {
-            await studentsCollection().add(student);
-            existingMobiles.add(student.mobile);
-            added++;
+            const { error } = await supabase.from("students").insert(chunk);
+            if (error) throw error;
+            added += chunk.length;
         } catch (err) {
-            invalid++;
+            console.error("Import chunk error:", err);
+            // Fall back to one-by-one so a single bad row can't fail the batch.
+            for (const row of chunk) {
+                try {
+                    const { error } = await supabase.from("students").insert(row);
+                    if (error) throw error;
+                    added++;
+                } catch (e) {
+                    invalid++;
+                }
+            }
         }
     }
+
+    if (added > 0) await reloadStudents();
 
     return { added, skipped, invalid };
 }
@@ -2367,16 +2572,18 @@ if (importFileInput) {
 
 /* ================= ATTENDANCE ================= */
 
-// Each day's attendance is stored as one small document per student, at
-// students/{uid}/attendance/{YYYY-MM-DD}/records/{studentId} — never one
-// big shared document — so two staff marking different classes on the
-// same day (or fixing a mistake later) can never overwrite each other.
-function attendanceRecordsRef(dateStr) {
-    return db.collection("students")
-        .doc(workspaceOwnerUid)
-        .collection("attendance")
-        .doc(dateStr)
-        .collection("records");
+// Each day's attendance is stored as one small row per student in the
+// attendance_records table (owner_id + date + student_id) — never one big
+// shared row — so two staff marking different classes on the same day (or
+// fixing a mistake later) can never overwrite each other.
+async function fetchAttendanceForDate(dateStr) {
+    const { data, error } = await supabase
+        .from("attendance_records")
+        .select("student_id, hours")
+        .eq("owner_id", workspaceOwnerUid)
+        .eq("date", dateStr);
+    if (error) throw error;
+    return data || [];
 }
 
 const attendanceBtn = document.getElementById("attendanceBtn");
@@ -2477,11 +2684,11 @@ async function loadAttendanceForCurrentSelection() {
     });
 
     try {
-        const snapshot = await attendanceRecordsRef(dateStr).get();
-        snapshot.forEach((doc) => {
-            const hours = doc.data().hours;
-            if (freshState[doc.id] && Array.isArray(hours) && hours.length === 5) {
-                freshState[doc.id] = hours;
+        const rows = await fetchAttendanceForDate(dateStr);
+        rows.forEach((row) => {
+            const hours = row.hours;
+            if (freshState[row.student_id] && Array.isArray(hours) && hours.length === 5) {
+                freshState[row.student_id] = hours;
             }
         });
     } catch (err) {
@@ -2556,20 +2763,19 @@ attendanceSaveBtn.onclick = async () => {
     const now = new Date();
 
     try {
-        const batch = db.batch();
-        const ref = attendanceRecordsRef(dateStr);
+        const rows = list.map((s) => ({
+            owner_id: workspaceOwnerUid,
+            date: dateStr,
+            student_id: s.id,
+            hours: attendanceState[s.id] || [true, true, true, true, true],
+            marked_by: markerName,
+            marked_by_uid: currentUser.id,
+        }));
 
-        list.forEach((s) => {
-            const hours = attendanceState[s.id] || [true, true, true, true, true];
-            batch.set(ref.doc(s.id), {
-                hours: hours,
-                markedBy: markerName,
-                markedByUid: currentUser.uid,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        });
-
-        await batch.commit();
+        const { error } = await supabase
+            .from("attendance_records")
+            .upsert(rows, { onConflict: "owner_id,date,student_id" });
+        if (error) throw error;
 
         attendancePopup.classList.remove("active");
         showAttendanceRecordReceipt(dateStr, list, markerName, now);
@@ -2658,24 +2864,39 @@ document.getElementById("copyAttendanceRecordBtn").onclick = function () {
 /* ---------- attendance PDF report ---------- */
 
 async function buildAttendanceRecordsMap(dateStr) {
-    const snapshot = await attendanceRecordsRef(dateStr).get();
+    const rows = await fetchAttendanceForDate(dateStr);
     const map = {};
-    snapshot.forEach((doc) => {
-        const hours = doc.data().hours;
-        map[doc.id] = Array.isArray(hours) && hours.length === 5
+    rows.forEach((row) => {
+        const hours = row.hours;
+        map[row.student_id] = Array.isArray(hours) && hours.length === 5
             ? hours
             : [true, true, true, true, true];
     });
     return map;
 }
 
-// Fetches every date's records in parallel: { dateStr: { studentId: hours[] } }
+// Fetches the whole range in ONE query: { dateStr: { studentId: hours[] } }
 async function buildAttendanceRecordsMapForRange(dateList) {
-    const perDateMaps = await Promise.all(dateList.map((d) => buildAttendanceRecordsMap(d)));
     const combined = {};
-    dateList.forEach((d, i) => {
-        combined[d] = perDateMaps[i];
+    dateList.forEach((d) => { combined[d] = {}; });
+
+    const { data, error } = await supabase
+        .from("attendance_records")
+        .select("date, student_id, hours")
+        .eq("owner_id", workspaceOwnerUid)
+        .in("date", dateList);
+    if (error) throw error;
+
+    (data || []).forEach((row) => {
+        const hours = row.hours;
+        // PostgREST may return date as "YYYY-MM-DD" already; normalize just in case.
+        const key = typeof row.date === "string" ? row.date.slice(0, 10) : row.date;
+        if (!combined[key]) combined[key] = {};
+        combined[key][row.student_id] = Array.isArray(hours) && hours.length === 5
+            ? hours
+            : [true, true, true, true, true];
     });
+
     return combined;
 }
 

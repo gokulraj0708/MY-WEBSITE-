@@ -1,7 +1,7 @@
 {
   "name": "Student Management System",
   "short_name": "Students",
-  "description": "Manage student records with Firebase-backed authentication and storage.",
+  "description": "Manage student records with Supabase-backed authentication and storage.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
