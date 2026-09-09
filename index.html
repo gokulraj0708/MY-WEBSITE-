@@ -21,10 +21,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 
-    <!-- Firebase (Auth + Firestore) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <!-- Supabase (Auth + Postgres) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- PDF Export (jsPDF + autoTable) and PDF Import reading (pdf.js) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -62,7 +60,7 @@
         <div class="auth-divider"><span>or</span></div>
 
         <button id="googleSignInBtn" type="button">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="">
+            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg" alt="">
             Sign in with Google
         </button>
 
@@ -554,21 +552,15 @@ Add Student
 </div> <!-- /#appContent -->
 
 <script>
-    // ====== PASTE YOUR FIREBASE CONFIG HERE ======
-    // Firebase Console -> Project Settings -> General -> Your apps -> SDK setup and config
-    const firebaseConfig = {
-        apiKey: "AIzaSyDXOfsJMc09CZK88tf1Tqwx38kc25JUAJA",
-        authDomain: "student-533ac.firebaseapp.com",
-        projectId: "student-533ac",
-        storageBucket: "student-533ac.firebasestorage.app",
-        messagingSenderId: "394958751398",
-        appId: "1:394958751398:web:9886c482935bfcd3891667"
-    };
-    // ==============================================
+    // ====== SUPABASE CONFIG ======
+    // Project: https://wjxcileyccpxxautqxxx.supabase.co
+    // Before first use, run supabase-schema.sql once in
+    // Supabase Dashboard -> SQL Editor (creates tables + security).
+    const SUPABASE_URL = "https://wjxcileyccpxxautqxxx.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_oPwkCnKvnVny4j0uVQCIvg_wzPQmSSg";
+    // ==============================
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </script>
 
 <script src="script.js"></script>
