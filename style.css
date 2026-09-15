@@ -42,7 +42,7 @@ body{
     transition:opacity .4s ease;
 }
 
-/* JS adds this once Firebase has determined whether the user
+/* JS adds this once Supabase has determined whether the user
    is already logged in, so we never flash the login screen. */
 .loader.hide{
     opacity:0;
