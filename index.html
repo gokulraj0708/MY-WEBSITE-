@@ -10,8 +10,10 @@
     <!-- PWA: makes the app installable with its own icon and window -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2575fc">
-    <link rel="icon" href="icon1.jpg">
-    <link rel="apple-touch-icon" href="icon1.jpg">
+    <!-- Use the icon that is actually shipped with the site. The previous
+         missing icon reference made the service worker install fail with a 404. -->
+    <link rel="icon" href="file_0000000080f081f6aacdb770d3c41620.png">
+    <link rel="apple-touch-icon" href="file_0000000080f081f6aacdb770d3c41620.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -21,8 +23,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 
-    <!-- Supabase (Auth + Postgres) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase (Auth + Postgres). Keep a second CDN as a fallback so a
+         transient jsDelivr failure cannot leave the app behind its loader. -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="this.onerror=null; this.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js';">
+    </script>
 
     <!-- PDF Export (jsPDF + autoTable) and PDF Import reading (pdf.js) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -560,7 +566,11 @@ Add Student
     const SUPABASE_ANON_KEY = "sb_publishable_oPwkCnKvnVny4j0uVQCIvg_wzPQmSSg";
     // ==============================
 
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Store the client under an app-specific name. Keeping the SDK namespace
+    // (`window.supabase`) separate avoids fragile cross-script `const` bindings.
+    window.smsSupabase = window.supabase && typeof window.supabase.createClient === "function"
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+        : null;
 </script>
 
 <script src="script.js"></script>
@@ -584,6 +594,20 @@ Add Student
             }, 2500);
         }
     });
+
+    // Never leave visitors staring at a spinner forever if a third-party
+    // script, an auth refresh, or a network request fails before the app can
+    // finish booting. The normal auth path hides this much sooner.
+    setTimeout(() => {
+        const loader = document.getElementById('loader');
+        if (!loader || loader.classList.contains('hide')) return;
+
+        loader.classList.add('hide');
+        const authError = document.getElementById('authError');
+        if (authError && !authError.textContent) {
+            authError.textContent = 'The app took too long to connect. Please refresh and try again.';
+        }
+    }, 12000);
 </script>
 
 </body>

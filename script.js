@@ -1,4 +1,9 @@
 
+// The inline bootstrap stores the initialized Supabase client here. Keeping
+// this explicit is safer than relying on a top-level const shared by two
+// separate classic script tags.
+const supabase = window.smsSupabase;
+
 /* ================= ANIMATED ALERT / CONFIRM DIALOGS ================= */
 /* Drop-in, promise-based replacements for the native window.alert() and
    window.confirm() browser popups, styled to match the app's own popups. */
@@ -374,6 +379,11 @@ authSwitchLink.onclick = (e) => {
 };
 
 authSubmitBtn.onclick = async () => {
+    if (!supabase || !supabase.auth) {
+        authError.textContent = "Authentication is temporarily unavailable. Please refresh and try again.";
+        return;
+    }
+
     const email = authEmail.value.trim();
     const password = authPassword.value;
 
@@ -448,6 +458,11 @@ const authInfo = document.getElementById("authInfo");
 forgotPasswordLink.onclick = async (e) => {
     e.preventDefault();
     authError.textContent = "";
+
+    if (!supabase || !supabase.auth) {
+        authError.textContent = "Authentication is temporarily unavailable. Please refresh and try again.";
+        return;
+    }
     authInfo.textContent = "";
 
     const email = authEmail.value.trim();
@@ -483,6 +498,11 @@ function usesPasswordAuth(user) {
 
 resetPasswordBtn.onclick = async () => {
     teamMenu.classList.remove("show");
+
+    if (!supabase || !supabase.auth) {
+        showAlert("Authentication is temporarily unavailable. Please refresh and try again.", "error");
+        return;
+    }
 
     if (!currentUser || !currentUser.email) return;
 
@@ -716,6 +736,11 @@ const googleSignInBtn = document.getElementById("googleSignInBtn");
 
 googleSignInBtn.onclick = async () => {
     authError.textContent = "";
+
+    if (!supabase || !supabase.auth) {
+        authError.textContent = "Authentication is temporarily unavailable. Please refresh and try again.";
+        return;
+    }
     authInfo.textContent = "";
     try {
         const { error } = await supabase.auth.signInWithOAuth({
@@ -775,12 +800,16 @@ function studentToRow(student, ownerId) {
 async function ensureUserDirectoryEntry(user) {
     if (!user || !user.email) return;
     try {
-        await supabase.from("users").upsert({
+        const { error } = await supabase.from("users").upsert({
             id: user.id,
             email: user.email,
             name: getUserDisplayName(user),
         }, { onConflict: "id" });
+        if (error) throw error;
     } catch (err) {
+        // Directory lookup is a convenience for sharing a workspace. A
+        // temporary directory/RLS error must not prevent the owner from
+        // opening their own student list.
         console.warn("Directory entry error:", err);
     }
 }
@@ -949,17 +978,61 @@ async function handleAuthUser(user) {
     // Now that we know whether the user is already logged in, reveal the
     // right screen. This keeps an already-logged-in user from ever seeing
     // the login screen flash — they go straight to the app.
-    const loader = document.getElementById("loader");
-    if (loader) {
-        loader.classList.add("hide");
-    }
-
+    hideInitialLoader();
     authInitialized = true;
 }
 
-supabase.auth.onAuthStateChange((_event, session) => {
-    handleAuthUser(session && session.user ? session.user : null);
-});
+function hideInitialLoader() {
+    const loader = document.getElementById("loader");
+    if (loader) loader.classList.add("hide");
+}
+
+function reportAuthBootError(err) {
+    console.error("Authentication boot error:", err);
+    currentUser = null;
+    cleanupRealtime();
+    appContent.style.display = "none";
+    authScreen.style.display = "flex";
+    if (authError) {
+        authError.textContent = "Could not connect to authentication. Please refresh and try again.";
+    }
+    hideInitialLoader();
+}
+
+// Supabase warns against doing async work directly inside
+// onAuthStateChange: the auth lock is still held while the callback runs,
+// so a database request there can deadlock and leave the loader spinning.
+// Queue the actual work for the next macrotask, after the callback returns.
+let authHandling = Promise.resolve();
+
+function queueAuthUser(session) {
+    const user = session && session.user ? session.user : null;
+
+    authHandling = authHandling
+        .catch((err) => console.error("Previous auth transition failed:", err))
+        .then(() => new Promise((resolve) => {
+            setTimeout(async () => {
+                try {
+                    await handleAuthUser(user);
+                } catch (err) {
+                    reportAuthBootError(err);
+                } finally {
+                    hideInitialLoader();
+                    resolve();
+                }
+            }, 0);
+        }));
+}
+
+if (supabase && supabase.auth && typeof supabase.auth.onAuthStateChange === "function") {
+    supabase.auth.onAuthStateChange((_event, session) => {
+        queueAuthUser(session);
+    });
+} else {
+    authSubmitBtn.disabled = true;
+    googleSignInBtn.disabled = true;
+    reportAuthBootError(new Error("Supabase client failed to initialize"));
+}
 
 // Shows/hides everything that depends on the current user's role. Called
 // once the workspace/role is known, and again any time the role changes.
@@ -1963,7 +2036,7 @@ function getDateRange(fromStr, toStr) {
 }
 
 if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 }
 
@@ -2431,7 +2504,11 @@ if (openFileManagerBtn) {
 }
 
 async function extractPdfText(arrayBuffer) {
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    if (!window.pdfjsLib) {
+        throw new Error("PDF reader is unavailable");
+    }
+
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = "";
 
     for (let i = 1; i <= pdf.numPages; i++) {

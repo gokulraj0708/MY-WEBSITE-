@@ -35,7 +35,7 @@ The app handles both modes, so pick whichever you want:
 ### Site URL (important for password reset + Google login)
 1. Go to **Authentication → URL Configuration**
 2. Set **Site URL** to where your app is hosted
-   (e.g. `https://gokulraj0708.github.io` or your custom domain)
+   (for this deployment: `https://vetty-pasanga.vercel.app/index.html`, or your custom domain)
 3. Under **Redirect URLs**, add the same URL (and `http://localhost:8080` for testing)
 
 ---
