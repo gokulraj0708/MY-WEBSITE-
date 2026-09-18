@@ -1,8 +1,19 @@
 
-// The inline bootstrap stores the initialized Supabase client here. Keeping
-// this explicit is safer than relying on a top-level const shared by two
-// separate classic script tags.
-const supabase = window.smsSupabase;
+// The inline bootstrap in index.html stores the initialized Supabase client
+// in window.smsSupabase. We deliberately expose it as a window PROPERTY
+// instead of declaring a top-level `const supabase`:
+//
+// All classic scripts on a page share one global lexical scope, so if ANY
+// other script on the page (e.g. a stale index.html still served from an old
+// service-worker cache, whose inline bootstrap also declared `supabase`)
+// already has a top-level `supabase` binding, a `const supabase` here throws
+// "SyntaxError: Identifier 'supabase' has already been declared". That aborts
+// this ENTIRE file before a single line runs — no auth setup, the loader is
+// never hidden, and the login page dies with "The app took too long to
+// connect." A property assignment can never throw that error, and every bare
+// `supabase.auth` / `supabase.from(...)` reference below keeps working
+// because it resolves to this window property.
+window.supabase = window.smsSupabase || window.supabase;
 
 /* ================= ANIMATED ALERT / CONFIRM DIALOGS ================= */
 /* Drop-in, promise-based replacements for the native window.alert() and

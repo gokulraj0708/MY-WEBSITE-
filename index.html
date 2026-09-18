@@ -579,7 +579,11 @@ Add Student
     // Register service worker so browsers offer the "Install" / "Add to Home Screen" prompt.
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').catch((err) => {
+            // updateViaCache:'none' makes the browser bypass its HTTP cache
+            // when checking sw.js for updates, so a fixed service worker
+            // (like this one) reaches clients on the next visit instead of
+            // being held back by a cached copy of the old worker.
+            navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch((err) => {
                 console.warn('Service worker registration failed:', err);
             });
         });
