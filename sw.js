@@ -2,10 +2,11 @@
 // third-party libraries always go to the network.
 //
 // The cache version must change when the app shell changes. In particular,
-// v2 clears the old Firebase-era shell that could otherwise keep serving a
-// stale index.html/script.js after the Supabase migration.
-
-const CACHE_NAME = 'sms-shell-v2';
+// v2 cleared the old Firebase-era shell. v3 clears any v2 cache that may
+// hold a stale index.html/script.js pair (a stale page declaring its own
+// `supabase` next to a freshly loaded script.js is what crashed the login
+// page with "Identifier 'supabase' has already been declared").
+const CACHE_NAME = 'sms-shell-v3';
 const SHELL_FILES = [
   './index.html',
   './style.css',
@@ -47,6 +48,26 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Last-resort fallback so event.respondWith() can NEVER resolve to undefined
+// (which throws "TypeError: Failed to convert value to 'Response'") and can
+// never reject (which surfaces as "the FetchEvent ... resulted in a network
+// error response"). Both errors were seen on the login page.
+function offlineFallback(isNavigation) {
+  if (isNavigation) {
+    return new Response(
+      '<!DOCTYPE html><meta charset="utf-8">' +
+      '<title>You are offline</title>' +
+      '<p>You appear to be offline. Reconnect and reload to use the app.</p>',
+      {
+        status: 503,
+        statusText: 'Offline',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      }
+    );
+  }
+  return new Response('Offline', { status: 503, statusText: 'Offline' });
+}
+
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
@@ -56,20 +77,48 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const networkFetch = fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
+  const isNavigation = request.mode === 'navigate';
 
-      // Serve a cached shell instantly while refreshing it in the background.
-      return cached || networkFetch;
-    })
+  // "cache.add('./index.html')" stores the page under ".../index.html", but a
+  // navigation to the site root asks for ".../" — a plain caches.match("/")
+  // therefore ALWAYS missed, which forced navigations onto the network and,
+  // when the network failed, into the undefined-Response crash below.
+  // Normalize navigations to the canonical cache key.
+  const cacheKey = isNavigation
+    ? new Request(new URL('index.html', self.registration.scope))
+    : request;
+
+  event.respondWith(
+    (async () => {
+      try {
+        // Network-first: always prefer the freshly deployed file so the HTML
+        // and the script.js/style.css it loads can never come from two
+        // different app versions (that exact mismatch crashed the login
+        // page with a duplicate `supabase` declaration).
+        const fresh = await fetch(request);
+
+        if (fresh && fresh.ok) {
+          const copy = fresh.clone();
+          // Fire-and-forget; swallow errors so cache.put can never surface
+          // as an unhandled rejection.
+          caches
+            .open(CACHE_NAME)
+            .then((cache) => cache.put(cacheKey, copy))
+            .catch(() => {});
+        }
+
+        // Even a non-OK response (404, etc.) is a valid Response.
+        return fresh;
+      } catch (networkError) {
+        // Offline or the network request failed: fall back to the cache.
+        const cached = await caches.match(cacheKey);
+        if (cached) {
+          return cached;
+        }
+
+        // Nothing cached either way — still return a REAL Response.
+        return offlineFallback(isNavigation);
+      }
+    })()
   );
 });
